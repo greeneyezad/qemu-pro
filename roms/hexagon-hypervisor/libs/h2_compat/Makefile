@@ -1,0 +1,160 @@
+
+ALL: dummy
+
+OPTIMIZE := -Os
+
+CFLAGS := -I$(INSTALLPATH)/include -I../../libs/syscall/angel/include -G0 $(OPTIMIZE) $(OPT_ADD) -mv$(TOOLARCH) -DARCHV=$(ARCHV) -Wall -Wno-builtin-requires-header -Werror -g
+
+ifdef DEBUG
+CFLAGS += -DDEBUG
+endif
+
+ifdef PARANOID
+	CFLAGS += -DPARANOID
+endif
+
+#export H2_LIB_INCLUDE=$(shell pwd)/include
+#
+#ASM_FILES = src/h2_futex.S src/h2_intwait.S src/h2_mutex.S src/h2_thread.S src/h2_cycles.S src/h2_sem.S src/h2_fastint.S src/h2_prio.S src/#h2_allsignal.S src/h2_anysignal.S src/h2_prefetch.S src/h2_cond.S src/h2_barrier.S src/h2_config.S src/h2_vmtraps.S src/h2_hwconfig.S src/#h2_pmu.S src/h2_vm.S
+#C_FILES = src/h2_alloc.c src/h2_pipe.c src/h2_printf.c src/h2_rmutex.c src/h2_map.c src/h2_error.c
+#
+#O_FILES = $(ASM_FILES:.S=.o) $(C_FILES:.c=.o)
+
+CFLAGS += $(LIB_CFLAGS) $(H2_EXTRA_CFLAGS)
+
+SRC_HFILES := 
+DEST_HFILES := 
+CLEAN_EXTRAS := 
+
+REF_CFILES := 
+REF_SFILES := 
+REF_OFILES := 
+
+CHECK_CFILES := 
+CHECK_SFILES := 
+CHECK_OFILES := 
+
+OPT_V2_CFILES := 
+OPT_V2_SFILES := 
+OPT_V2_OFILES := 
+
+OPT_V3_CFILES := 
+OPT_V3_SFILES := 
+OPT_V3_OFILES := 
+
+OPT_V4_CFILES := 
+OPT_V4_SFILES := 
+OPT_V4_OFILES := 
+
+OPT_V5_CFILES := 
+OPT_V5_SFILES := 
+OPT_V5_OFILES := 
+
+OPT_V60_CFILES := 
+OPT_V60_SFILES := 
+OPT_V60_OFILES := 
+
+OPT_V65_CFILES := 
+OPT_V65_SFILES := 
+OPT_V65_OFILES := 
+
+OPT_V68_CFILES := 
+OPT_V68_SFILES := 
+OPT_V68_OFILES := 
+
+OPT_V73_CFILES := 
+OPT_V73_SFILES := 
+OPT_V73_OFILES := 
+
+OPT_V81_CFILES := 
+OPT_V81_SFILES := 
+OPT_V81_OFILES := 
+
+BUILD_DIR := $(INSTALLPATH)/../build/libs/h2_compat
+H2_BUILD_DIR    := $(INSTALLPATH)/../build/libs/h2
+POSIX_BUILD_DIR := $(INSTALLPATH)/../build/libs/posix
+CFLAGS += -I$(BUILD_DIR)/include -I$(H2_BUILD_DIR)/include -I$(POSIX_BUILD_DIR)/include
+
+MKINCLUDES := $(shell find . -name make.inc)
+
+MAKE_INC_DEFAULT := build/make/make.inc.default
+
+define DO_INCLUDE
+LIB := h2
+DIR := $(dir $(MODPATH))
+MOD := $(strip $(shell basename $(dir $(MODPATH))))
+include $(MODPATH)
+endef
+
+$(foreach MODPATH,$(MKINCLUDES),$(eval $(DO_INCLUDE)))
+
+ALL_OFILES := $(REF_OFILES) $(CHECK_OFILES) $(OPT_V2_OFILES) $(OPT_V3_OFILES) $(OPT_V4_OFILES) $(OPT_V5_OFILES) $(OPT_V60_OFILES) $(OPT_V65_OFILES) $(OPT_V68_OFILES) $(OPT_V73_OFILES) $(OPT_V81_OFILES)
+
+$(ALL_OFILES): $(DEST_HFILES)
+
+ifeq ($(ARCHV),3)
+OPT_OFILES := $(OPT_V3_OFILES)
+endif
+
+ifeq ($(ARCHV),4)
+OPT_OFILES := $(OPT_V4_OFILES)
+endif
+
+ifeq ($(ARCHV),5)
+OPT_OFILES := $(OPT_V5_OFILES)
+endif
+
+ifeq ($(ARCHV),60)
+OPT_OFILES := $(OPT_V60_OFILES)
+endif
+
+ifeq ($(ARCHV),65)
+OPT_OFILES := $(OPT_V65_OFILES)
+endif
+
+ifeq ($(ARCHV),68)
+OPT_OFILES := $(OPT_V68_OFILES)
+endif
+
+ifeq ($(ARCHV),73)
+OPT_OFILES := $(OPT_V73_OFILES)
+endif
+
+ifeq ($(ARCHV),81)
+OPT_OFILES := $(OPT_V81_OFILES)
+endif
+
+ifeq ($(findstring /ref/,$(BUILD_DIR)),/ref/)
+$(BUILD_DIR)/libh2_compat.a: $(REF_OFILES)
+	mkdir -p $(dir $@); \
+	$(AR) cru $@ $(sort $(REF_OFILES))
+else
+$(BUILD_DIR)/libh2_compat.a: $(OPT_OFILES)
+	mkdir -p $(dir $@); \
+	$(AR) cru $@ $(sort $(OPT_OFILES))
+endif
+
+$(BUILD_DIR)/%.o : %.c
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o : %.S
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+clean:
+	rm -rf $(DEST_HFILES) $(CLEAN_EXTRAS) $(BUILD_DIR) include
+
+dummy:
+	@echo $(REF_CFILES)
+	@echo $(REF_SFILES)
+	@echo $(REF_OFILES)
+	@echo $(SRC_HFILES)
+	@echo $(DEST_HFILES)
+	@echo $(HELLO)
+
+includes: $(DEST_HFILES)
+
+ref: $(BUILD_DIR)/libh2_compat.a
+
+opt: $(BUILD_DIR)/libh2_compat.a

@@ -1,0 +1,76 @@
+/*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+/*
+ * h2_trap_constants
+ * Just the constants we need for traps into the kernel
+ *
+ * WARNING: THIS IS INCLUDED BY ASSEMBLY FILES! DEFINES ONLY
+ */
+
+#ifndef H2_TRAP_CONSTANTS_H
+#define H2_TRAP_CONSTANTS_H 1
+
+#define H2_TRAP_THREAD_ID 1
+#define H2_TRAP_FUTEX_WAIT 2
+#define H2_TRAP_FUTEX_WAKE 3
+#define H2_TRAP_THREAD_CREATE 4
+#define H2_TRAP_THREAD_STOP 5
+#define H2_TRAP_CPUTIME 6
+//#define H2_UNUSED 7
+#define H2_TRAP_REGISTER_FASTINT 8
+#define H2_TRAP_PRIO_SET 9
+#define H2_TRAP_PRIO_GET 10
+#define H2_TRAP_INTWAIT 11
+#define H2_TRAP_YIELD 12
+#ifdef DO_PROFILE
+#define H2_TRAP_SAMPLE 13
+#else
+//#define H2_UNUSED 13
+#endif
+#define H2_INTPOOL_CONFIG 14
+#define H2_INTPOOL_WAIT 15
+#define H2_TRAP_GET_PCYCLES 16
+//#define H2_UNUSED 17
+#define H2_TRAP_SET_TID 18
+#define H2_TRAP_GET_TID 19
+#define H2_TRAP_FUTEX_LOCK_PI 20
+#define H2_TRAP_FUTEX_UNLOCK_PI 21
+#define H2_TRAP_TIMEROP 22
+#define H2_TRAP_SOFT_NMI 23
+#define H2_TRAP_TLBOP 24
+#define H2_TRAP_THREAD_STATE 25
+#define H2_TRAP_INFO 26
+#define H2_TRAP_WAITCYCLES 27
+#define H2_TRAP_VMOP 28
+#define H2_TRAP_PMUCTRL 29
+#define H2_TRAP_CONFIG 30
+#define H2_TRAP_HWCONFIG 31
+
+#define H2_VMTRAP_RETURN 1
+#define H2_VMTRAP_SETVEC 2
+#define H2_VMTRAP_SETIE 3
+#define H2_VMTRAP_GETIE 4
+#define H2_VMTRAP_INTOP 5
+
+#define H2_VMTRAP_CLRMAP 10
+#define H2_VMTRAP_NEWMAP 11
+
+#define H2_VMTRAP_CACHECTL 13
+#define H2_VMTRAP_GET_PCYCLES 14
+#define H2_VMTRAP_SET_PCYCLES 15
+#define H2_VMTRAP_WAIT 16
+#define H2_VMTRAP_YIELD 17
+#define H2_VMTRAP_START 18
+#define H2_VMTRAP_STOP 19
+#define H2_VMTRAP_VMPID 20
+#define H2_VMTRAP_SETREGS 21
+#define H2_VMTRAP_GETREGS 22
+#define H2_VMTRAP_TIMEROP 24
+#define H2_VMTRAP_PMUCTRL 25
+#define H2_VMTRAP_INFO 26
+
+#endif
+

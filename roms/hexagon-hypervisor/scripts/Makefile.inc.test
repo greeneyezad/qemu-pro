@@ -1,0 +1,532 @@
+# Dear emacs, this is a -*- Makefile -*-
+
+ifndef MAKE_INC_TEST
+MAKE_INC_TEST := 1
+
+################################################################################
+#  Test makefile doesn't share above the test dir
+################################################################################
+
+#  symbolic link to h2 project directory
+#h2: 
+#	-ln -s ${H2DIR} $@
+
+################################################################################
+#  Tool stuff
+################################################################################
+
+default-target: all
+
+# overrides for tests linked in kernel space
+H2K_HEAP_SIZE =  0x00010000
+H2K_STACK_SIZE = 0x00001000
+
+include $(H2DIR)/scripts/Makefile.inc.config
+include $(H2DIR)/scripts/Makefile.inc.opensource
+include $(H2DIR)/scripts/Makefile.inc.version
+include $(H2DIR)/scripts/Makefile.inc.constants
+include $(H2DIR)/scripts/Makefile.inc.tools
+
+ifeq ($(USE_PKW),1)
+export PKW_VERSIONS := hexagon-tools=$(TOOLS_FLAVOR_KERNEL) arch=$(ARCH_FLAVOR)
+endif
+
+ifeq ($(MODEL),)
+   MODEL = ref
+   MODELSTR = ${MODEL}
+else
+   ifeq ($(MODEL),ref)
+      MODELSTR = ${MODEL}
+   else
+      MODELSTR = ${MODEL}_v${ARCHV}
+   endif
+endif
+
+ifeq ($(INSTALLPATH),)
+export INSTALLPATH := $(H2DIR)/artifacts/v$(ARCHV)/$(MODEL)/install
+endif
+
+# T is the build variant (opt or ref).  Exported from the top-level makefile when
+# called via 'make opt/ref/cov/test'.  Default to opt if not set (e.g. standalone).
+T ?= opt
+
+# Per-ARCHV/variant directory for test build artifacts (not installed, not in-source).
+TEST_BUILD_ROOT ?= $(patsubst %/install,%/build/tests,$(INSTALLPATH))
+
+ifeq ($(KERNELPATH),)
+export KERNELPATH := $(H2DIR)/kernel
+endif
+
+
+PYTHON=python3
+
+BUSPENALTY=
+TIMING=
+#Till I figure out something better, here is that file
+RUN ?= hexagon-sim
+
+TIMING ?= --timing
+
+BUSPENALTY ?= --buspenalty 50
+
+ULIMIT ?= 600
+
+_BASIC_SIMF=$(TIMING) --simulated_returnval $(BUSPENALTY)
+
+ifeq (hexagon-sim, $(notdir $(firstword ${RUN})))
+SIMF=${_BASIC_SIMF}
+endif
+
+ifeq (hexagon-sim, $(notdir $(firstword ${RUN})))
+SIMF=${_BASIC_SIMF}
+endif
+
+################################################################################
+#  Rules for building the kernel if necessary; should be built way before any
+#  batch jobs are run else they will maul each other in the animal farm.
+#
+#  Actually, I've broken the dependency between the libs and the executable so 
+#  they will never actually try to build the libs; if you need the libs, you 
+#  should 'make libs' before you run.
+################################################################################
+
+LIBH2_DIR=${INSTALLPATH}/lib
+LIBH2=${LIBH2_DIR}/libh2.a
+
+LIBH2KERNEL_DIR=${INSTALLPATH}/lib
+LIBH2KERNEL=${LIBH2KERNEL_DIR}/libh2kernel.a
+# libh2check.a is now built and installed by kernel ref_install/opt_install.
+LIBH2CHECK=${INSTALLPATH}/lib/libh2check.a
+
+#  Needs to have the tools already in path...
+#SIMPATH=/pkg/qct/software/hexagon/releases/tools/1.2/qc/bin
+#TOOLPATH=/pkg/qct/software/hexagon/releases/tools/1.2/gnu/bin
+#COVPATH=/pkg/qct/software/hexagon/releases/tools/1.2/examples/utils/bin
+
+${LIBH2KERNEL}: ${INSTALLPATH}
+
+# libh2check.a is installed as part of the full build (ref_install/opt_install).
+${LIBH2CHECK}: ${INSTALLPATH}
+
+${LIBH2}:  ${INSTALLPATH}
+
+${INSTALLPATH}:
+	cd ${H2DIR} && $(MAKE) TARGET=$(TARGET) ARCHV=${ARCHV}
+
+# $(INSTALLPATH)/ver is written by opt/ref recipes as a version/git-info record.
+# It is no longer used as a test dependency — $(INSTALLPATH)/manifest replaced it.
+$(INSTALLPATH)/ver:
+	cd ${H2DIR} && $(MAKE) TARGET=$(TARGET) ARCHV=${ARCHV}
+
+# $(INSTALLPATH)/manifest is written by opt/ref after all install artifacts land.
+# sha256sums of libh2kernel.a, libh2.a, libh2check.a, and booter — only updated
+# when content changes, so tests re-run iff something actually changed.
+# If manifest is missing, auto-build the install.
+$(INSTALLPATH)/manifest:
+	cd ${H2DIR} && $(MAKE) TARGET=$(TARGET) ARCHV=${ARCHV}
+
+${BOOTER}: ${INSTALLPATH}
+
+
+# (_8^(|)  d'oh!
+#  Need to tell people to stop using this one and use 'prepare'
+libs: ${LIBH2} ${LIBH2CHECK} ${LIBH2KERNEL} ${BOOTER}
+
+prepare: ${LIBH2} ${LIBH2CHECK} ${LIBH2KERNEL} ${BOOTER}
+
+clean_libs:
+	cd ${H2DIR};\
+	rm -rf artifacts/v$(ARCHV)/$(MODEL); $(MAKE) clean
+
+clean_top:
+	rm -Rf test.cov_fns cov.txt $(INSTALLPATH)/cov/cov.txt $(INSTALLPATH)/cov/cov.rpt $(INSTALLPATH)/cov/cov_fns $(INSTALLPATH)/cov/cov_files
+
+
+################################################################################
+#  Standard compilation flags
+################################################################################
+
+OPTIMIZE := -O1
+
+# For tests are linked in monitor space we don't have __bootvm_entry.  Instead,
+# go directly to qdsp6_pre_main (i.e. the old way).  Tests that use booter are
+# unaffected by this, because booter has already been built.
+
+# FIXME: Remove H2K_LOAD_ADDR=$(H2K_LINK_ADDR) when tests are no longer in
+# monitor space
+
+KERNEL_BUILD_DIR := $(patsubst %/install,%/build/kernel,$(INSTALLPATH))
+KERNEL_INCLUDES := -I $(KERNEL_BUILD_DIR)/include -I ${H2DIR}/libs/h2/common
+
+H2K_KERNEL_NPAGES ?= 0
+
+LDFLAGS += -Wl,--defsym=__bootvm_entry_point=hexagon_pre_main -Wl,--defsym=__bootvm_entry=qdsp6_pre_main -Wl,--defsym=H2K_KERNEL_NPAGES=$(H2K_KERNEL_NPAGES) -Wl,--defsym=H2K_LOAD_ADDR=$(H2K_LINK_ADDR) -Wl,-e=start # -Wl,--defsym=__entry=$(H2K_LOAD_ADDR)
+
+ifdef BOOT
+BOOTER=${INSTALLPATH}/bin/booter
+CFLAGS += $(OPTIMIZE) -mv${TOOLARCH} -DARCHV=${ARCHV} -DH2K_GUEST_START=${H2K_GUEST_START} -Wall -Wno-builtin-requires-header -g
+LDFLAGS += -Wl,--section-start=.start=$(H2K_GUEST_START)
+else
+CFLAGS += $(OPTIMIZE) -mv${TOOLARCH} -DARCHV=${ARCHV} -DH2K_LINK_ADDR=$(H2K_LINK_ADDR) -Wall -Wno-builtin-requires-header -g
+ifndef STANDALONE
+
+# 0xfffffff0 means don't call the hook
+LDFLAGS += -Wl,--defsym=__h2_handle_errors_hook__=0xfffffff0 -Wl,--defsym=__h2_thread_stop_hook__=0xfffffff0 -Wl,--section-start=.start=$(H2K_LINK_ADDR) -Wl,--defsym=HEAP_SIZE=$(H2K_HEAP_SIZE) -Wl,--defsym=STACK_SIZE=$(H2K_STACK_SIZE) -Wl,--defsym=H2K_ALLOC_HEAP_SIZE=$(H2K_ALLOC_HEAP_SIZE)
+endif
+endif
+
+ifdef STANDALONE
+CFLAGS += @${H2DIR}/kernel/build/flags/abi @${H2DIR}/kernel/build/flags/testabi $(KERNEL_INCLUDES) -I ${INSTALLPATH}/include -DH2K_GIT_COMMIT=$(H2K_GIT_COMMIT) -DH2K_ALLOC_HEAP_SIZE=$(H2K_ALLOC_HEAP_SIZE)
+LDFLAGS += -Wl,--defsym=__h2_handle_errors_hook__=0xfffffff0 -Wl,--defsym=__h2_thread_stop_hook__=0xfffffff0 -lh2kernel -lh2 -lh2check -L ${INSTALLPATH}/lib
+ASFLAGS += -mv${TOOLARCH} -DARCHV=${ARCHV} -Wall -Wno-builtin-requires-header $(KERNEL_INCLUDES) -I ${INSTALLPATH}/include
+ifeq ($(EN_LLVM_COV), 1)
+CFLAGS += ${LLVM_COV_CFLAGS}
+LDFLAGS += ${LLVM_COV_LDFLAGS}
+endif
+ifdef LOGBUF
+CFLAGS += -DH2K_LOG_PRINTF
+_logbuf_one_level := $(subst ],,$(word 2,$(subst [, ,$(LOGBUF))))
+ifneq ($(_logbuf_one_level),)
+CFLAGS += -DH2K_LOG_LEVEL=$(_logbuf_one_level)
+endif
+endif
+
+else # non-STANDALONE
+OSLIB=-moslib=h2
+
+ifdef BOOT # use booter
+LDFLAGS +=${OSLIB} -L ${INSTALLPATH}/lib
+
+else # run in place of booter
+LDFLAGS +=${OSLIB} -lh2kernel -lh2 -lh2check -L ${INSTALLPATH}/lib
+endif # BOOT
+
+CFLAGS += -I ${INSTALLPATH}/include
+ASFLAGS += -mv${TOOLARCH} -DARCHV=${ARCHV} -Wall -I ${INSTALLPATH}/include
+endif #STANDALONE
+
+ifdef SOFT_BKL
+CFLAGS  += -DSOFT_BKL
+ASFLAGS += -DSOFT_BKL
+endif
+
+LDFLAGS+= -mv${TOOLARCH} -Qunused-arguments
+#  Turn on call() support for assertion checking
+#CFLAGS += -DDEBUG
+#  Optimization level needs to match whatever the kernel is compiled with.
+
+ifdef INC_KERNEL
+CFLAGS += $(KERNEL_INCLUDES)
+ASFLAGS += $(KERNEL_INCLUDES)
+endif
+
+ifdef DEBUG
+CFLAGS += -DDEBUG
+endif
+
+CFLAGS += $(EXTRA_CFLAGS)
+ASFLAGS += $(EXTRA_ASFLAGS)
+
+ifdef RECOMPILE_SRCS_PREFS
+VPATH += $(RECOMPILE_DIRS)
+ifeq ($(BUILD_TYPE),ref)
+OBJS += $(foreach m,$(RECOMPILE_SRCS_PREFS),\
+  $(if $(wildcard $(addsuffix /$(m).ref.c,$(RECOMPILE_DIRS)) $(addsuffix /$(m).ref.S,$(RECOMPILE_DIRS))),\
+    $(m).ref.o,$(m).v$(ARCHV)opt.o))
+else
+OBJS += $(foreach m,$(RECOMPILE_SRCS_PREFS),\
+  $(if $(wildcard $(addsuffix /$(m).v$(ARCHV)opt.S,$(RECOMPILE_DIRS)) $(addsuffix /$(m).v$(ARCHV)opt.c,$(RECOMPILE_DIRS))),\
+    $(m).v$(ARCHV)opt.o,$(m).ref.o))
+endif
+endif
+
+################################################################################
+#  Convenience shortcuts
+################################################################################
+
+ifdef SUBDIRS
+
+################################################################################
+#  Recursive subdirectory traversal
+################################################################################
+
+#SUBDIR_MAKE=+for SUBDIR in ${SUBDIRS}; do\
+#	$(MAKE) -C $$SUBDIR $(MAKECMDGOALS) TEST=$$SUBDIR; TSTAT=$$?; \
+#        if [ $$TSTAT -ne 0 ]; then STAT=$$TSTAT; fi; \
+#	done; exit $$STAT
+
+#SUBDIR_TARGETS=clean all
+
+#${SUBDIR_TARGETS}:
+#	${SUBDIR_MAKE}
+
+#  Uh...  don't run this unless all the tests are run for now.
+# (cov.txt and cov.rpt are now defined in Makefile.coverage as
+#  $(INSTALLPATH)/cov.txt and $(INSTALLPATH)/cov.rpt.)
+
+#  every "subdir" needs to have a results.txt in it for this to run properly.
+#  if no results.txt, FAIL
+#  if results.txt is empty, FAIL
+#  
+#	      grep -A 1 FAIL $$SUBDIR/test.log >> report.html; \
+#	      echo FAIL:  no pass signature >> report.html;\
+
+# Derive variant name (opt/ref) from the install path for the JSON generator.
+_VARIANT := $(notdir $(patsubst %/install,%,$(INSTALLPATH)))
+
+# Per-variant parseable test results JSON.  Depends on RESULT_FILES so it is
+# only regenerated when a test result actually changes after a new build.
+$(INSTALLPATH)/test_results.json: $(RESULT_FILES)
+	python3 $(H2DIR)/scripts/gen_test_results.py \
+	    --test-build-root $(TEST_BUILD_ROOT) \
+	    --subdirs "$(SUBDIRS)" \
+	    --archv $(ARCHV) --variant $(_VARIANT) \
+	    --output $@
+
+# Write the h2 test report directly into the artifact directory.
+# Using $@ avoids the root-level intermediate file that h2_report.html/report.html create,
+# so parallel ARCHV builds do not conflict on a shared source-root filename.
+# Depends on RESULT_FILES so it is only regenerated when test results change.
+$(INSTALLPATH)/test_report.html: $(RESULT_FILES)
+	@echo "<html><body><table>" > $@;\
+	for SUBDIR in ${SUBDIRS}; do\
+	   echo "<tr><td> $$SUBDIR</td>" >> $@;\
+	   if [ ! -s $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt ]; then\
+	      echo '<td><font style="background-color: red;">' >> $@; \
+	      echo 'Missing results.txt, that should not be!' >> $@; \
+	      echo '</font></td>' >> $@; \
+	   else\
+	      grep "TEST PASSED" $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt > /dev/null; \
+	      if [ $$? -eq 0 ]; then \
+	         echo '<td>' >> $@; \
+		 cat $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt >> $@; \
+		 echo '</td>' >> $@; \
+	      else \
+	         echo '<td><font style="background-color: red;">' >> $@; \
+		 cat $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt >> $@; \
+		 echo '</font></td>' >> $@; \
+	      fi; \
+	   fi; \
+	done;\
+	echo "</table></body></html>" >> $@
+
+# Write the qurt test report directly into the artifact directory (same pattern
+# as $(INSTALLPATH)/test_report.html above).
+$(INSTALLPATH)/qurt_report.html: $(RESULT_FILES)
+	@echo "<html><body><table>" > $@;\
+	for SUBDIR in ${SUBDIRS}; do\
+	   echo "<tr><td> $$SUBDIR</td>" >> $@;\
+	   if [ ! -s $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt ]; then\
+	      echo '<td><font style="background-color: red;">' >> $@; \
+	      echo 'Missing results.txt, that should not be!' >> $@; \
+	      echo '</font></td>' >> $@; \
+	   else\
+	      grep "TEST PASSED" $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt > /dev/null; \
+	      if [ $$? -eq 0 ]; then \
+	         echo '<td>' >> $@; \
+		 cat $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt >> $@; \
+		 echo '</td>' >> $@; \
+	      else \
+	         echo '<td><font style="background-color: red;">' >> $@; \
+		 cat $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt >> $@; \
+		 echo '</font></td>' >> $@; \
+	      fi; \
+	   fi; \
+	done;\
+	echo "</table></body></html>" >> $@
+
+check-fail:
+	@((((for SUBDIR in ${SUBDIRS}; do\
+	   echo -n "$$SUBDIR: "; \
+	   if [ ! -s $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt ]; then\
+	      echo FAIL - Empty/No results.txt; \
+	      echo; \
+	      exit 1;\
+	   fi;\
+	   grep "ERROR" $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt;\
+	   if [ $$? -eq 0 ]; then\
+	      echo FAIL - ERROR detected in results.txt; \
+	      echo; \
+	      exit 1;\
+	   fi;\
+	   grep "FAIL" $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt;\
+	   if [ $$? -eq 0 ]; then\
+	      echo FAIL - FAIL detected in results.txt; \
+	      echo; \
+	      exit 1;\
+	   fi;\
+	   grep "status 0xaaafa7a1" $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt;\
+	   if [ $$? -eq 0 ]; then\
+	      echo FAIL - status 0xaaafa7a1 detected in results.txt; \
+	      echo; \
+	      exit 1;\
+	   fi;\
+	   grep "TEST PASSED" $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt;\
+	   if [ $$? -ne 0 ]; then\
+	      echo FAIL - No PASS detected in results.txt; \
+	      echo; \
+	      exit 1;\
+	   fi;\
+	   echo; \
+	done 2>&1; echo $? >&3) | tee -a $(TESTOUT) >&4) 3>&1) | (read stat; exit $$stat)) 4>&1
+
+check:
+	@for SUBDIR in ${SUBDIRS}; do\
+	   echo -n "$$SUBDIR: "; \
+	   if [ ! -s $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt ]; then\
+	      echo FAIL - Empty/No results.txt; \
+	      echo; \
+	      continue;\
+	   fi;\
+	   grep "ERROR" $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt;\
+	   if [ $$? -eq 0 ]; then\
+	      echo FAIL - ERROR detected in results.txt; \
+	      echo; \
+	      continue;\
+	   fi;\
+	   grep "FAIL" $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt;\
+	   if [ $$? -eq 0 ]; then\
+	      echo FAIL - FAIL detected in results.txt; \
+	      echo; \
+	      continue;\
+	   fi;\
+	   grep "status 0xaaafa7a1" $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt;\
+	   if [ $$? -eq 0 ]; then\
+	      echo FAIL - status 0xaaafa7a1 detected in results.txt; \
+	      echo; \
+	      exit 1;\
+	   fi;\
+	   grep "TEST PASSED" $(TEST_BUILD_ROOT)/$$SUBDIR/results.txt;\
+	   if [ $$? -ne 0 ]; then\
+	      echo FAIL - No PASS detected in results.txt; \
+	      echo; \
+	      continue;\
+	   fi;\
+	   echo; \
+	done
+
+
+else
+
+DUMP:= $(patsubst %.elf,%.objdump,$(EXEC))
+EXEC_TMP := ${EXEC}_tmp
+
+################################################################################
+#  These are for actual terminal directories
+################################################################################
+%.objdump: %.elf
+	${OBJDUMP} -d ${@:.objdump=.elf} ${BOOTER} > $@; \
+	if [ $$? -ne 0 ]; then echo -e "FAIL ${TEST}\ndisassm fail"|tee test.log; fi
+
+ifdef PYTHON_GENERATOR_SCRIPT
+${PYTHON_GENERATED_FILES}: ${PYTHON_GENERATOR_SCRIPT}
+	${PYTHON} $<; \
+	if [ $$? -ne 0 ]; then echo -e "FAIL ${TEST}\nbuild fail"|tee test.log; fi
+endif
+
+%.o: %.c ${PYTHON_GENERATED_FILES}
+	${CC} ${CFLAGS} -c -o $@ $<; \
+	if [ $$? -ne 0 ]; then echo -e "FAIL ${TEST}\nbuild fail"|tee test.log; fi
+
+%.o: %.S ${PYTHON_GENERATED_FILES}
+	${CC} ${ASFLAGS} -c -o $@ $<; \
+	if [ $$? -ne 0 ]; then echo -e "FAIL ${TEST}\nbuild fail"|tee test.log; fi
+
+${EXEC_TMP}: ${OBJS}
+# How's this for an ugly hack?
+	${CC} -o $@ ${OBJS} ${LDFLAGS} 2>&1 | perl -pe 's/.*Symbol.*__h2_.*_hook__.*is defined in both linker script and input file.*//'; \
+	CODE=$${PIPESTATUS[0]}; \
+	if [ "$$CODE" -ne 0 ]; then echo -e "FAIL ${TEST}\nbuild fail"|tee test.log; fi
+
+${EXEC}: ${EXEC_TMP} | constants
+# How's this for an ugly hack?
+	${CC} -o $@ ${OBJS} ${LDFLAGS} 2>&1 | perl -pe 's/.*Symbol.*__h2_.*_hook__.*is defined in both linker script and input file.*//'; \
+	CODE=$${PIPESTATUS[0]}; \
+	if [ "$$CODE" -ne 0 ]; then echo -e "FAIL ${TEST}\nbuild fail"|tee test.log; fi
+
+ignore_fns: ${OBJS}
+	${H2DIR}/scripts/gen_ignore_fns.pl ${OBJS} > $@
+
+test.log: ${EXEC}
+	> $@
+ifeq ($(USE_PKW),1)
+	echo PKW_VERSIONS $(PKW_VERSIONS) >> $@
+	echo PKW_arch $(PKW_arch) >> $@
+	echo PKW_hexagon-tools $(PKW_hexagon-tools) >> $@
+endif
+	ulimit -t ${ULIMIT} && ${RUN} ${SIMF} --profile -- ${BOOTER} ${BOOTER_ARGS} ${EXEC} | tee $@; \
+	CODE=$${PIPESTATUS[0]}; \
+	echo exit status == $$CODE; \
+	if [ "$$CODE" -eq 137 ]; then \
+	   echo -e "\nERROR: ${TEST}: probably ulimit" >> $@; \
+	fi; \
+	if [ "$$QURT_TEST" != "" ]; then \
+		if [ "$$CODE" -ne 0 ]; then \
+			echo "FAIL" >> $@; \
+		else \
+			echo "TEST PASSED" >> $@; \
+		fi; \
+	fi;
+	$(POST_RUN)
+
+# Coverage stuff -- single testcase
+
+.PHONY: try_gmon_out
+
+try_gmon_out: test.log
+	rm -f gmon.out; \
+	find . -maxdepth 1 | egrep -q 'gmon\.t_'; \
+	if [ $$? -eq 0 ]; then \
+		${GMON_MERGE} -o gmon.out gmon.t_*; \
+	else \
+		find . -maxdepth 1 | egrep -q 'gmon\-0x'; \
+		if [ $$? -eq 0 ]; then \
+			${GMON_MERGE} -o gmon.out gmon-0x*; \
+		fi; \
+	fi
+
+COVFILE=cov.txt
+GMON_FILES=gmon.* gmon-*
+
+${COVFILE}: ${DUMP} try_gmon_out ignore_fns
+	if [ -f gmon.out ]; then \
+		${COV} -F -d ${DUMP} -o cov.txt gmon.out; \
+		if [ $$? -ne 0 ]; then echo -e "FAIL ${TEST}\ncoverage fail"; exit 1; fi; \
+	else \
+		find . -maxdepth 1 -name 'gmon-0x????????.out' | perl -ne 'chomp; $$f = $$_; s/^\.\/gmon-//; s/.out$$//; system("$(COV) -F -d test.objdump -o cov-$$_.txt $$f")'; \
+		find . -name 'cov-0x*.txt' | $(PYTHON) ${H2DIR}/scripts/merge_cov.py --dir $(H2DIR) --installpath $(INSTALLPATH) > $@; \
+	fi; \
+	if [ $$? -ne 0 ]; then echo -e "FAIL ${TEST}\ncoverage fail"; exit 1; fi
+
+CLEANUP=${PYTHON_GENERATED_FILES} ${OBJS} ${EXEC} ${EXEC_TMP} ${COVFILE} cov*.txt* ${GMON_FILES} ${DUMP} make.log test.log results.txt h2 threadmap.py
+CLEANUP += stats.txt stats_help.txt ihist.txt prof.txt ignore_fns pmu_statsfile.txt pmu_stats.txt default.profraw
+
+clean:
+	rm -rf ${CLEANUP}
+
+#  Pretty much a binary yes/no if the test passed or failed.
+results.txt: test.log
+	@grep -A 1 "ERROR" test.log > $@; \
+	if [ $$? -eq 0 ]; then exit 1; fi; \
+	grep -A 1 "FAIL" test.log > $@; \
+	if [ $$? -eq 0 ]; then exit 1; fi; \
+	grep -A 1 "status 0xaaafa7a1" test.log > $@; \
+	if [ $$? -eq 0 ]; then exit 1; fi; \
+	grep "TEST PASSED" test.log > $@; \
+	if [ $$? -eq 0 ]; then exit 0; fi; \
+	if [ ! -s test.log ]; then \
+	  echo "FAIL - Test log empty" > $@; \
+	  exit 1; \
+	fi; \
+	echo "NO PASS/FAIL/ERROR in log" > $@; \
+	exit 1;
+
+all: results.txt ${COVFILE}
+tst: results.txt
+test: results.txt
+.PHONY: test tst all
+
+
+endif
+
+endif

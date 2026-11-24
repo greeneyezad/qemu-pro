@@ -1,0 +1,244 @@
+
+
+
+	********************* Futexes Timing Out ****************
+
+If we get an interrupt and the thread is blocked on a futex, we should:
+	* Set its r0100 return value to a FAILURE
+	* Take the interrupt (timer, external, whatever) 
+
+	This should greatly simplify the monitor side; if the thread is 
+	somehow BLOCKED in some way we just tweak the r0100, remove it from
+	its data structure, and run it.
+
+	* The OS should see the position as if it were just after the futex 
+		blocking trap, with r0100 having the failure code
+	* The Guest can do whatever it likes, but probably just handles
+		the interrupt.
+	* In userspace (or whatever called the futex) if we get failure
+		from a futex wait, we can check the time to see if 
+		it was due to a timeout; sequence should be:
+		+ Ask for alarm
+		+ Futex wait
+		+ If success, cancel the alarm
+		+ If failure, Check to see if it's past wakeup time
+			(e.g., alarm signal might set a variable)
+		+ Alternatively, alarm could longjmp or something 
+			from signal handler?
+	* It's only slightly more tricky to write the user space code
+		when futexes can wakeup spuriously, but that allows us
+		to push the complexity for these things down towards
+		user space, which is good.
+
+
+
+
+
+
+TODO:
+	When going to guest mode, need to save IE information.
+	When returning from guest mode, need to restore IE information.
+
+
+TBD:
+	In V3, should we have "User" or "Guest" as the bit in SSR.ASID?
+	Permissions should match, and V4 has a "user" permission, rather
+	than a "guestonly" permission.  OTOH, we check if "guest", though
+	this can probably be "if (!user)"
+
+
+
+            ************* Interrupt Handling **************
+
+
+Interrupt:
+	* Fastint --> take fastint
+	* Resched --> take resched
+	* IPI --> check sanity
+
+Are those are the only two options from interrupt handler?
+
+Fastint --> take fastint (in "init" context) --> VMSWI for virtual-machine
+  destined interrupts?
+	+ removes L2 interrupt controller, non-fastint handlers from kernel
+	+ Deciding Phys Int -- Virt Int mapping outside kernel
+	- Potentially slower 
+	- Potentially don't want VMSWI trap in fastint context
+
+VMSWI --> VM event
+  Just a first stab:
+  * Set global event pending 
+  * Look up VM Event --> VM Handler Thread
+  * Set VM Handler Thread->status = NEEDS_VMWORK
+  * If VM Handler Thread->mode == RUNNING: IPI;
+  * If VM Handler Thread->Mode == READY: nothing
+  * If VM Handler Thread->mode == INTWAIT: ready / check sanity
+  * If VM Handler thread->mode == Futex: ???
+
+  When thread does vmwork code, if it can take the interrupt it will clear
+  the appropriate global interrupt pending bit and take the interrupt.
+
+TBD:
+
+* Keep track of where a thread is?  Requires another store every state switch,
+  but helps when trying to track it down (prio adjustment, event, etc)
+  * Sometimes (prio adjustment) moving out of ready list is important, sometimes
+    (interrupt) not so important.
+
+* Do POSIX signals work like interrupts?  SIGKILL?
+
+* Where/how to check permissions, global int map?
+
+
+Linux signals set signals in the dest, and then hunt to see if the thread is
+running, needs to be unblocked, whether blocking can be interrupted, etc.  When
+a thread is switched to, it checks the mask to see if it should handle signals
+before returning.
+
+
+
+	******************* pi / better m/futexes *******************
+
+Word has ThreadID in upper bits.  Lower bits have state information.
+
+PIFutexWait -- like normal, uses upper bits of val as threadid
+
+PIFutexHandoff(u32_t *ptr, u32_t unlocked_val) -- Wakes best priority thread
+putting in that threadid, or writes unlocked_val if no other threads are
+waiting.
+
+
+Keep on boosting holder priority while waiting.  Unlock happens in correct 
+priority order.  New threads coming in will boost holder prio, then get 
+resumed in right order.
+
+TBD: following the blocked chain?
+
+
+Normal Futex Pass:
+
+States:
+	* Unlocked
+	* Locked, no waiters
+	* Locked + Waiters (maybe)
+	* Pass
+
+
+Alternative:
+	Field 0:
+		* Locked
+		* Unlocked
+		* Pass
+	Field 1:
+		* n_waiters
+
+
+If we come into a mutex and we see pass, we need to block.
+
+Pass state only valid if threads are waiting and we can wake up.
+Two ways to know this:
+	* Count of waiters (maybe?)
+	* Try and wake one thread, if zero returned, set to normal 
+		unlocked (and then wait just to be sure)
+
+
+	******************** Thread ID *****************
+
+Thread ID to context pointer:
+
+Thread ID has three fields:
+	31:N - VM index
+	N:8 - VCPU index
+	7:0 - reserved for user
+
+VM Index 0 is boot context, only one VCPU, so 0x000000XX is boot thread
+
+Each VM has a thread context array and max # of threads, created at vm boot time
+
+Thread ID --> Pointer: 
+	vm = KGP->vms[VM_IDX]; if (vm == NULL) FAIL;
+	if (VCPU_IDX) > vm->n_vcpus) FAIL;
+	return vm->vcpu[VCPU_IDX];
+
+Keep thread ID in thread context; could replace VM block pointer, since that's
+determinable based on thread ID msbits.
+
+
+	******************** Preemption Disable *****************
+
+Clear IE bit in SSR.  Blocking still allowed.  Raise priority; select
+someone else as lowprio.
+
+
+
+
+
+
+
+
+	******************** Multilevel Translations ************
+
+Guest maps Virtual -> Intermediate
+
+But... we'll probably need to support KVM/XEN/VMWARE.
+
+So, we will have
+
+Virtual -> Intermediate -> Intermediate -> Physical
+     (Linux)        (VMWare)           (h2)
+
+
+And, just because it's awesome, it would be nice to have:
+
+Virtual -> Intermediate -> Intermediate -> Intermediate -> Physical
+
+
+Virtual is obviously what registers hold.
+
+Physical is obviously what the actual machine holds.
+
+TLB needs to translate Virtual -> Physical.
+
+Thus, my recommendation is that STLB also holds Virtual -> Physical
+
+However, every time you walk a page table, say at the Linux level, every lookup
+is really a virtual address from some other level.
+
+So let's just make it a real virtual address.
+
+Each address space maps a set of Input addresses to a set of Output addresses.
+We can have an "Output ASID".  If this ASID is something special (-1 or 0 or
+something), the output address is a physical address and we are done.
+
+If the "Output ASID" is not the special value, we just need to continue looking
+up the translation, but now we just recurse into the same algorithm with a new ASID. 
+
+The STLB (or indeed, TLB) can be used at any time while walking any structure
+to convert any non-physical address to a physical one.
+
+Using the real TLB might be very interesting, the TLB walk code could just
+switch to the target ASID and use virtual loads/stores... if there's a TLB miss
+then the nested TLB miss handler would switch to the target ASID and get *that*
+fault fixed up, etc.  Would require lots of thinking about the right way to
+nest, but it isn't too inelegant.
+
+
+	**************** Multilevel Permissions / DSM ************
+
+At some level, someone is going to figure out the DSM.  
+
+It's probably easiest to do this at the highest level possible... and that
+should probably be how we research this; get KVM working on each node and
+then have all the KVM hosts to implement the protocol for their guests.
+
+OTOH, it might be simpler if we could do it at the lowest level.
+
+Doing the DSM dance fundimentally means removing permissions that the guest
+environments think they have.  This might be write permissions (in the case of
+shared pages), or it might be read permissions (if the page is not shared
+to the current coherence domain).  That means that whatever translations might
+cache the permissions, we need to invalidate the cache.  And as we look up 
+V->P, we need the last level to include the DSM permissions in addition to 
+whatever other policy we might have.
+
+

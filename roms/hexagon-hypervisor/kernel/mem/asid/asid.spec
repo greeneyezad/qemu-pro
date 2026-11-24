@@ -1,0 +1,151 @@
+
+:mod:`asid` -- Address Space IDentification Management
+=======================================================
+
+.. module:: asid
+
+Overview
+--------
+
+The Hexagon Architecture uses Address Space IDentifiers (ASIDs) to 
+distinguish between different virtual address spaces.
+
+The Hexagon Hypervisor attempts to abstract the ASID feature of the
+machine.  
+
+Different Address Spaces must have different ASIDs.  Currently,
+oversubscription of ASIDs is not supported.  This means that the Hexagon
+Hypervisor will support a fixed maximum number of address spaces maintained by
+the hypervisor.  
+
+Guest environments can have arbitrarily large numbers of address spaces,
+however a limited number of address spaces may be specified by all threads
+simultaneously.
+
+Each ASID has a reference count and a translation base. The translation base is
+passed as a logical address by the guest, but maintained as a physical address
+by the hypervisor to ensure that it is unique.  This translation of the base
+address is done using the translations associated with the vmblock of the
+guest.
+
+When a thread is created, it increments the reference count on the inherited
+address space.  When a thread changes to a new set of translations, the
+reference count for the old address space is decremented and the reference
+count for the new address space is incremented.  If a reference count drops to
+zero, the address space is considered not currently used, and the ASID is
+available for reuse.  However, the address space is still considered valid
+until notifed otherwise by the guest.  This allows guests to leave cached
+translations around for several address spaces.
+
+H2K_asid_table
+--------------
+
+.. c:type:: H2K_asid_entry_t
+
+	Entry for the ASID table
+
+	.. c:member:: u32_t ptb
+
+		Base physical address for translation tables
+
+	.. c:member:: u16_t count
+
+		Reference count for the address space
+
+	.. c:member:: u8_t maxhops
+
+		Maximum number of hops from collisions at this bin.  When we add
+		a new entry to the table, we set maxhops to the maximum of the old
+		value and the new number of hops that was required to insert the entry.
+
+        .. c:member:: translation_type transtype
+
+	        Type of translation for this address space
+
+.. c:var:: H2K_asid_entry_t H2K_asid_table[MAX_ASIDS]
+
+
+H2K_asid_table_search
+---------------------
+
+.. c:function:: static inline H2K_asid_entry_t *H2K_asid_table_search(u32_t ptb)
+
+Description
+~~~~~~~~~~~
+
+Looks for an existing ASID entry configured for PTB.  Returns NULL if one is
+not found.
+
+
+
+H2K_asid_table_eviction
+-----------------------
+
+.. c:function:: H2K_asid_entry_t *H2K_asid_table_eviction(u32_t ptb)
+
+Description
+~~~~~~~~~~~
+
+Looks for an appropriate ASID to evict to create space for a new entry.
+
+Returns NULL if all ASIDs are busy.
+
+Updates maxhops in the bucket hashed to.
+
+H2K_asid_table_inc
+------------------
+
+.. c:function:: s32_t H2K_asid_table_inc(u32_t ptb, translation_type type, tlb_invalidate_flag flag, H2K_vmblock_t *vmblock)
+
+	:param ptb: Address of the translation base
+	:param type: Type of translation
+	:param flag: Invalidate TLB entries for this ASID
+	:param extra: Extra translation info
+	:param vmblock: pointer to vmblock of guest
+
+Description
+~~~~~~~~~~~
+
+This routine searches for an ASID already configured to specify the
+address space pointed to by ptb.
+
+If the ptb is null, error.  Return -1.
+
+First the ptb is translated to its physical address using the vmblock pmap,
+unless the translation type is OFFSET.  In this case the ptb value is in fact
+the guest's vmblock pointer, which is already unique.  This value is used as a
+placeholder in the ASID table but is not actually referenced.
+
+If an ASID was already configured to specify the address space, 
+the reference count is incremented.  Otherwise, we find a free 
+ASID and set the reference count to 1.
+
+If flag is TRUE, invalidate the ASID in the TLB.
+
+If no free ASID is available, -1 is returned.  Otherwise, the ASID
+corresponding to the "ptb" is returned.
+
+
+Functionality
+~~~~~~~~~~~~~
+
+We hash into the asid table, and if not found, we traverse the table looking
+for a matching entry.  If an entry is found, we increment the reference count.
+Otherwise, we find the best free ASID (either an invalid one, or one with a 
+reference count of zero) and use that.
+
+
+H2K_asid_table_dec
+------------------
+
+.. c:function:: void H2K_asid_table_dec(u32_t asid)
+
+	:param asid: Address space to decrement reference count for
+
+
+Description
+~~~~~~~~~~~
+
+This routine decrements the reference count for the ASID specified.
+
+

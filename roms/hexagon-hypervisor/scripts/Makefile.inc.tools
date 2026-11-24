@@ -1,0 +1,153 @@
+# Dear emacs, this is a -*- Makefile -*-
+
+ifndef MAKE_INC_TOOLS
+MAKE_INC_TOOLS := 1
+
+export SHELL := /bin/bash
+
+ifneq (,${Q6VERSION})
+export ARCHV := $(patsubst 6%,60,$(subst v,,$(Q6VERSION)))
+else
+export ARCHV ?= 60
+endif
+
+#export SIMF := --timing
+
+export CC := hexagon-clang
+export CXX := hexagon-clang++
+export AS := hexagon-clang
+export AR := hexagon-ar
+export RANLIB := hexagon-ranlib
+export COV := $(H2DIR)/scripts/hexagon-coverage.py
+export LLVM_COV := hexagon-llvm-cov
+export OBJDUMP := hexagon-llvm-objdump
+export DWARFDUMP := hexagon-llvm-dwarfdump
+export GMON_MERGE := hexagon-gmon-merge
+export LLVM_PROFDATA := hexagon-llvm-profdata
+export DOXYGEN := doxygen
+ELFCOPY := hexagon-elfcopy
+
+
+export SIZE_TOOL := /prj/dsp/qdsp6/arch/scripts/section_size.py
+export LD := hexagon-clang
+
+export COM_CFLAGS := -Werror
+export COM_LDFLAGS :=
+
+
+# These are the LPASS bases; assumed in scripts/timer_v*.cfg
+ifeq (4, $(ARCHV))
+export SUBSYSTEM_BASE_ARCHSIM := 0x28880000
+export SUBSYSTEM_BASE_TOOLSIM := 0x2888
+else # >= V5
+export SUBSYSTEM_BASE_ARCHSIM := 0xfe280000
+export SUBSYSTEM_BASE_TOOLSIM := 0xfe28
+endif
+
+ifeq (4, $(ARCHV))
+TOOLS_FLAVOR ?= default
+TOOLS_FLAVOR_KERNEL ?= default
+ARCH_FLAVOR ?= v4_stable
+export COV := hexagon-llvm-cov
+else
+ifeq (5, $(ARCHV))
+TOOLS_FLAVOR ?= 7.3.06
+TOOLS_FLAVOR_KERNEL ?= 7.3.06
+ARCH_FLAVOR ?= v5_stable
+else
+ifeq (60, $(ARCHV))
+TOOLS_FLAVOR ?= 8.1.01
+TOOLS_FLAVOR_KERNEL ?= 8.1.01
+ARCH_FLAVOR ?= v60_latest
+else
+ifeq (65, $(ARCHV))
+TOOLS_FLAVOR ?= 8.4.04
+TOOLS_FLAVOR_KERNEL ?= 8.4.04
+ARCH_FLAVOR ?= v65_latest
+ifdef TINY_CORE
+TOOLS_FLAVOR := 8.4.04
+TOOLS_FLAVOR_KERNEL := 8.4.04
+ARCH_FLAVOR := v67_latest
+KERNEL_CFLAGS += -DTINY_CORE
+else
+KERNEL_CFLAGS += -mhvx -mhvx-length=128B -Wimplicit-int-conversion
+LIB_CFLAGS += -Wimplicit-int-conversion
+endif
+else
+ifeq (68, $(ARCHV))
+TOOLS_FLAVOR ?= 19.0.07
+TOOLS_FLAVOR_KERNEL ?= 19.0.07
+ARCH_FLAVOR ?= v68_latest
+KERNEL_CFLAGS += -mhvx -mhvx-length=128B -Wimplicit-int-conversion
+LIB_CFLAGS += -Wimplicit-int-conversion
+DEVSIM := archsim
+ELFCOPY := hexagon-llvm-objcopy
+else
+ifeq (73, $(ARCHV))
+TOOLS_FLAVOR ?= 19.0.07
+TOOLS_FLAVOR_KERNEL ?= 19.0.07
+ARCH_FLAVOR ?= v73_stable
+KERNEL_CFLAGS += -mhvx -mhvx-length=128B -Wimplicit-int-conversion
+LIB_CFLAGS += -Wimplicit-int-conversion
+DEVSIM := archsim
+ELFCOPY := hexagon-llvm-objcopy
+
+else # latest
+TOOLS_FLAVOR ?= 19.0.07
+TOOLS_FLAVOR_KERNEL ?= 19.0.07
+ARCH_FLAVOR ?= v81_stable
+KERNEL_CFLAGS += -mhvx -mhvx-length=128B -Wimplicit-int-conversion
+LIB_CFLAGS += -Wimplicit-int-conversion
+DEVSIM := archsim
+ELFCOPY := hexagon-llvm-objcopy
+
+endif
+endif
+endif
+endif
+endif
+endif
+
+export ELFCOPY
+
+DEVSIM ?= devsim
+
+DEVICE_CONFIG ?= $(H2DIR)/scripts/devsim_v$(ARCHV).cfg
+
+ifeq ($(USE_PKW),1)
+export PKW_VERSIONS := hexagon-tools=$(TOOLS_FLAVOR) arch=$(ARCH_FLAVOR)
+endif
+
+export RUN_DEVSIM := $(DEVSIM) $(DEVSIM_EXTRA) --quiet $(MAGIC_ANGEL) --subsystem_base $(SUBSYSTEM_BASE_ARCHSIM) --device_config $(DEVICE_CONFIG)
+
+export RUN_TOOLSIM := hexagon-sim $(TOOLSIM_EXTRA) --nullptr 0 --simulated_returnval --subsystem_base $(SUBSYSTEM_BASE_TOOLSIM) --cosim_file $(H2DIR)/scripts/timer_v${ARCHV}.cfg
+#export RUN_TOOLSIM := hexagon-sim 
+
+export TOOLARCH := $(ARCHV)
+export KERNEL_TOOLARCH := $(ARCHV)
+ifeq (60, $(TOOLARCH))
+export KERNEL_TOOLARCH := 61
+endif
+
+ifdef TINY_CORE
+export TOOLARCH := 67t
+export KERNEL_TOOLARCH := 67t
+endif
+
+export RUN := $(RUN_TOOLSIM)
+
+# if using pkw and ARCHV >=5, use devsim
+ifeq ($(USE_PKW),1)
+ifeq (0, $(shell [ $(ARCHV) -ge 5 ]; echo $$?))
+export RUN := $(RUN_DEVSIM)
+endif
+endif
+
+export SIM := $(RUN)
+OPTIMIZE ?= -O2
+export LLVM_COV_CFLAGS := -fprofile-instr-generate -fcoverage-mapping
+export LLVM_COV_LDFLAGS := -fprofile-instr-generate
+export OPTIMIZE_COV := -fno-inline
+export OPTIMIZE_DEBUG := -O0 -fno-inline
+
+endif

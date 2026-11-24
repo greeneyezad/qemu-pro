@@ -1,0 +1,63 @@
+/*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+#include <tlbfmt.h>
+#include <globals.h>
+#include <spinlock.h>
+#include <hw.h>
+#include <tlbinsert.h>
+#include <tlbmisc.h>
+
+#define TEMP_MAP_VA 0xff800000  // at most 8M for kernel
+#define TEMP_MAP_PG_SIZE SIZE_4K
+#define TEMP_MAP_PG_MASK(size) (0xffffffff << (PAGE_BITS + (size * 2)))
+#define TEMP_MAP_OFF_MASK(size) (~(TEMP_MAP_PG_MASK(size)))
+
+/* Return va of pa */
+u32_t H2K_tmpmap_add_and_lock(pa_t pa, u32_t cccc, u32_t size) {
+
+	H2K_mem_tlbfmt_t entry;
+	u32_t index;
+
+	if (SIZE_DEFAULT == size) {
+		size = TEMP_MAP_PG_SIZE;
+	}
+	entry.raw = 0;
+	entry.ppd = ((pa & TEMP_MAP_PG_MASK(size) ) >> (PAGE_BITS - 1)) | (1 << size);
+	entry.pa35 = (pa >> 35) & 0x1;
+#if ARCHV >= 73
+	entry.pa3637 = (pa >> 36) & 0x3;
+#endif
+	entry.cccc = cccc;
+	entry.xwru = 0;  // only monitor access
+	entry.vpn = (TEMP_MAP_VA >> PAGE_BITS);
+	// entry.asid = don't care
+	entry.global = 1;
+	entry.valid = 1;
+
+	/* Hold this lock until the caller calls H2K_tmpmap_remove_and_unlock() */
+	H2K_spinlock_lock(&H2K_gp->tmpmap_lock);
+
+	/* Lock TLB and allocate the last entry */
+	H2K_mutex_lock_tlb();
+	index = H2K_gp->last_tlb_index--;
+	if (H2K_gp->tlb_index >= index) H2K_gp->tlb_index = 0;
+	H2K_mem_tlb_insert_index(entry, index);  // and invalidate what's there
+	H2K_mutex_unlock_tlb();
+	return TEMP_MAP_VA | (pa & TEMP_MAP_OFF_MASK(size));
+}
+
+void H2K_tmpmap_remove_and_unlock() {
+
+	H2K_mutex_lock_tlb();
+	H2K_mem_tlb_write(++(H2K_gp->last_tlb_index), 0);  // invalidate tmpmap
+	H2K_mutex_unlock_tlb();
+	H2K_spinlock_unlock(&H2K_gp->tmpmap_lock);
+}
+
+void H2K_tmpmap_init() {
+
+	H2K_spinlock_init(&H2K_gp->tmpmap_lock);
+}

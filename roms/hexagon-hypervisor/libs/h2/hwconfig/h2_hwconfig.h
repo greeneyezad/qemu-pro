@@ -1,0 +1,323 @@
+/*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+#ifndef H2_HWCONFIG_H
+#define H2_HWCONFIG_H 1
+
+#include <stdlib.h>
+
+/** @file h2_hwconfig.h
+ @brief Hardware Configuration Interface
+*/
+/** @addtogroup h2 
+@{ */
+
+#include <h2_common_hwconfig.h>
+
+/**
+Raw interface for the hwconfig trap.  Do not use.  Instead, use an interface function such
+as h2_hwconfig_partition().
+@param[in] whichtrap	Which hardware configuration trap to use
+@param[in] ptr		Address argument for trap
+@param[in] a		First argument
+@param[in] b		Second argument
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+
+int h2_hwconfig_trap(hwconfig_type_t whichtrap, void *ptr, unsigned int a, unsigned int b);
+
+/**
+Get L2 register.
+@param[in] offset  Offset from L2 register base
+@returns register value or 0 on failure -- check kerror
+@dependencies Returns failure if offset out of range
+*/
+int h2_hwconfig_l2_get_reg(unsigned int offset);
+
+/**
+Set L2 register.
+@param[in] offset  Offset from L2 register base
+@param[in] val  Value to write
+@returns previous register value or 0 on failure -- check kerror
+@dependencies Returns failure if offset out of range
+*/
+int h2_hwconfig_l2_set_reg(unsigned int offset, unsigned int val);
+
+/**
+Get CLADE register.
+@param[in] offset  Offset from CLADE register base
+@returns register value or 0 on failure -- check kerror
+@dependencies Returns failure if offset out of range
+*/
+int h2_hwconfig_clade_get_reg(unsigned int offset);
+
+/**
+Set CLADE register.
+@param[in] offset  Offset from CLADE register base
+@param[in] val  Value to write
+@returns previous register value or 0 on failure -- check kerror
+@dependencies Returns failure if offset out of range
+*/
+int h2_hwconfig_clade_set_reg(unsigned int offset, unsigned int val);
+
+/**
+Configure the L2 cache size.
+@param[in] sizeval	Size to configure the L2 cache
+@param[in] use_wb	1 enables write-back mode in the L2, 0 disables write-back mode
+@returns 0 on success, negative value on error
+@dependencies May return failure if more than one thread is currently running
+*/
+int h2_hwconfig_l2cache_size(unsigned int sizeval, unsigned int use_wb);
+
+/**
+Configure partitioning.
+@param[in] whichcache	Select the cache to change partitioning on
+@param[in] partition_cfg	What type of partitioning for the specified cache
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_partition(unsigned int whichcache, unsigned int partition_cfg);
+
+/**
+Configure prefetch.
+@param[in] whichcache	Select the cache to change prefetch on
+@param[in] prefetch_cfg Prefetch type
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_prefetch(unsigned int whichcache, unsigned int prefetch_cfg);
+
+/**
+Set COPROC bits
+@param[in] coproc COPROC value
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_set_coprocbits(unsigned int coproc);
+
+/**
+Set XA2, XE2 bits.
+@param[in] xe2 XE2 value
+@param[in] xa2 XA2 value
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_set_hmxbits(unsigned int xe2,  unsigned int xa2);
+
+/**
+Set XE2 bit (deprecated).
+@param[in] xe2 XE2 value
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_hmxbits(unsigned int xe2);
+
+/**
+Set XA3, XE3 bits. for HLX
+@param[in] xe3 XE3 value
+@param[in] xa3 XA3 value
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_set_hlxbits(unsigned int xa3,  unsigned int xe3);
+
+/**
+Set XA, XE bits.
+@param[in] xa XA value
+@param[in] xe XE value
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_extbits(unsigned int xa, unsigned int xe);
+
+/**
+Set vector length
+@param[in] vlength Vector length log 2
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_vlength(unsigned int vlength);
+
+/**
+Control extension power state
+@param[in] state Power state (zero == off, nonzero == on)
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_extpower(unsigned int state);
+
+/**
+L2 lock address range
+@param[in] Virtual Address, should be aligned to 64 bytes
+@param[in] Length in bytes, should be multiple of 64 bytes
+@returns 0 on success, nonzero value on error
+@dependencies None
+*/
+int h2_hwconfig_l2locka(void *addr, unsigned int len);
+
+/**
+L2 unlock everything
+@returns 0 on success, nonzero value on error
+@dependencies None
+*/
+int h2_hwconfig_unlock(void);
+
+/**
+Control interrupt hardware directly
+@returns 0 on success, nonzero value on error
+@dependencies None
+*/
+int h2_hwconfig_hwintop(unsigned int op, unsigned int intno, unsigned int val);
+
+/**
+Start hardware threads with mask (-1 to start all)
+@param[in] mask Mask of thread numbers to start
+@returns mask of threads started on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_hwthreads_mask(unsigned int mask);
+
+/**
+Start number of hardware threads
+@param[in] num Number of threads to start
+@returns number of threads started on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_hwthreads_num(unsigned int num);
+
+/**
+Enable/Disable memory ECC
+@param[in] ecc_enable Mask of memories to enable
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_ecc(unsigned int ecc_enable);
+
+/**
+Read DMA configuration register
+@param[in] index  Index of register to read
+@returns Register value on success, negative value on error
+@dependencies none
+*/
+int h2_hwconfig_dma_getcfg(unsigned int index);
+
+/**
+Write DMA configuration register
+@param[in] index  Index of register to write
+@param[in] data  Data value to write
+@returns 0 on success, negative value on error
+@dependencies none
+*/
+int h2_hwconfig_dma_setcfg(unsigned int index, unsigned int data);
+
+/**
+Clean L2 cache
+@param[in] inv  Invalidate (zero == false, nonzero == true)
+@returns 0 on success, negative value on error
+@dependencies none
+*/
+int h2_hwconfig_l2gclean(unsigned int inv);
+
+/**
+Get stride prefetcher register.
+@param[in] offset  Offset from stride prefetcher register base
+@returns register value or 0 on failure -- check kerror
+@dependencies Returns failure if offset out of range
+*/
+int h2_hwconfig_strideprefetcher_get_reg(unsigned int offset);
+
+/**
+Set stride prefetcher register.
+@param[in] offset  Offset from stride prefetcher register base
+@param[in] val  Value to write
+@returns previous register value or 0 on failure -- check kerror
+@dependencies Returns failure if offset out of range
+*/
+int h2_hwconfig_strideprefetcher_set_reg(unsigned int offset, unsigned int val);
+
+/**
+Set HMX RSC sequence power-on start address
+@param[in] addr  Address
+@returns 0 on success, negative value on error
+@dependencies none
+*/
+int h2_hwconfig_hmxpower_on_set_addr(unsigned int addr);
+
+/**
+Set HMX RSC sequence power-off start address
+@param[in] addr  Address
+@returns 0 on success, negative value on error
+@dependencies none
+*/
+int h2_hwconfig_hmxpower_off_set_addr(unsigned int addr);
+
+/**
+Toggle power-measurement GPIO
+@param[in] val  Value (1 == on, 0 == off)
+@returns 0 on success, negative value on error
+@dependencies none
+*/
+int h2_hwconfig_gpio_toggle(unsigned int val);
+
+/**
+Set power-measurement GPIO physical address
+@param[in] addr  Address
+@returns 0 on success, negative value on error
+@dependencies none
+*/
+int h2_hwconfig_set_gpio_addr(unsigned long long int addr);
+
+/**
+Configure per-thread cache partition use
+@param[in] l2cp_cfg Partition selection
+@returns 0 on success, negative value on error
+@dependencies None
+*/
+int h2_hwconfig_l2cp(unsigned int l2cp_cfg);
+
+/**
+Get ECC register.
+@param[in] offset  Offset from ECC register base
+@returns register value or 0 on failure -- check kerror
+@dependencies Returns failure if offset out of range
+*/
+int h2_hwconfig_ecc_get_reg(unsigned int offset);
+
+/**
+Get VWCTRL register
+@returns register value or -1 on error
+@dependencies none
+*/
+int h2_hwconfig_vwctrl_get(void);
+
+/**
+Set VWCTRL register
+@param[in] value  Value
+@returns 0, negative value on error
+@dependencies none
+*/
+int h2_hwconfig_vwctrl_set(unsigned int val);
+
+/**
+Get DPM volt limits management register.
+@param[in] offset  Offset from DPM volt limits management register from base
+@returns register value or 0 on failure -- check kerror
+@dependencies Returns failure if offset out of range
+*/
+int h2_hwconfig_dpm_voltlmtmgmt_get_reg(unsigned int offset);
+
+/**
+Set DPM volt limits management register.
+@param[in] offset  Offset from DPM volt limits management register from base
+@param[in] val  Value to write
+@returns previous register value or 0 on failure -- check kerror
+@dependencies Returns failure if offset out of range
+*/
+int h2_hwconfig_dpm_voltlmtmgmt_set_reg(unsigned int offset, unsigned int val);
+
+#endif
+
+/** @} */

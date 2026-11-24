@@ -1,0 +1,8 @@
+STANDALONE=1
+
+OBJS+=test.o
+EXEC=test.elf
+
+include Makefile.inc
+CFLAGS += -DH2K_KERNEL_PGSIZE=$(H2K_KERNEL_PGSIZE)
+OSLIB=

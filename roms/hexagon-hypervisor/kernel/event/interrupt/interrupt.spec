@@ -1,0 +1,183 @@
+
+ASM_REF_CODE(Interrupt context save/restore not possible in C)
+
+:mod:`interrupt` -- Handle interrupt events
+===========================================
+
+.. module:: interrupt
+
+H2K_handle_int
+--------------
+
+.. c:function:: H2K_handle_int()
+
+Description
+~~~~~~~~~~~
+
+This handles the common set of interrupts.  The interrupt handler carefully
+saves any required context, and jumps to the appropriate handler for the 
+next step.
+
+Functionality
+~~~~~~~~~~~~~
+
+Most interrupts redirect to handle_int.
+
+Handle_int carefully saves off any required state.
+
+If the idle thread was interrupted, we detect the case as early as possible and
+skip the remainder of the context save.  If we have interrupted the idle
+thread, we do not care about saving the values of the registers.
+
+If the preemption point was interrupted, we detect the case as early as possible
+and skip the remainder of the context save.  If we have interrupted at the 
+preemption point, we do not care about saving the values of the registers.
+
+Interrupts can be handled by calling the reschedule function, or calling the
+function to handle fast interrupts.  The fast interrupt handler may be called
+before saving the registers saved by the ABI to improve performance.
+
+What function to call is determined by the table H2K_kg.inthandlers.  The format
+of each inthandler should be::
+
+	H2K_handler(u32_t intno, H2K_thread_context *me, u32_t hwtnum)
+
+Real interrupted threads (as opposed to, for example, the idle thread) that may 
+reschedule should have int_context_restore as the end of their continuation
+function.
+
+We leave to execute the interrupt handler that calls a stub routine.  This stub
+routine saves the return address in the continuation field before jumping to
+the appropriate location.
+
+H2K_int_context_restore
+-----------------------
+
+.. c:function:: H2K_int_context_restore()
+
+Description
+~~~~~~~~~~~
+
+This routine returns to an interrupted thread.  It restores the registers from
+the thread context and returns to the thread in the appropriate place.
+
+Functionality
+~~~~~~~~~~~~~
+
+The int_context_restore routine restores registers from the thread context and returns.
+
+
+H2K_interrupted_waitmode
+------------------------
+
+.. c:function:: H2K_interrupted_waitmode()
+
+Description
+~~~~~~~~~~~
+
+This routine is called when we detect that we were interrupted while in wait.  
+This is a common case, and we can avoid context save by branching to this 
+routine early.
+
+Functionality
+~~~~~~~~~~~~~
+
+We set up the stack pointer and call the correct function.
+
+
+H2K_interrupted_preempt
+-----------------------
+
+.. c:function:: H2K_interrupted_preempt()
+
+Description
+~~~~~~~~~~~
+
+This routine is called when we detect that we were interrupted at the kernel 
+preemption point.  This is a common case, and we can avoid context save by
+branching to this routine early.
+
+Functionality
+~~~~~~~~~~~~~
+
+We set up the stack pointer and call the correct function.
+
+
+H2K_interrupted_waitmode_or_preempt
+-----------------------------------
+
+
+:c:func:`H2K_interrupted_preempt()` and :c:func:`H2K_interrupted_waitmode()` have very 
+similar behavior.  It may be beneficial to combine these routines into a single one
+for lower code size.
+
+Description
+~~~~~~~~~~~
+
+This routine is called when we detect that we were interrupted while in wait,
+or have interrupted at the preemption point.  This is a common case, and we can
+avoid context save by branching to this routine early.
+
+Functionality
+~~~~~~~~~~~~~
+
+We set up the stack pointer and call the correct function.
+
+
+Testing
+-------
+
+
+Samples
+~~~~~~~
+
+* Input: thread context in SGP, or NULL, or 0x00000001
+* Input: H2K_inthandlers
+* Output: All (?) registers should be saved in thread context if SGP is a valid pointer
+* Flow: go to event handler for event number
+
+Important cases
+~~~~~~~~~~~~~~~
+
+* SGP is NULL (wait mode)
+* SGP is 0x01 and r0 is a valid context (preemption point)
+* SGP is a valid context
+* Each L1 interrupt
+* For V4, each L2 interrupt
+
+Harness
+~~~~~~~
+
+We will link only with the interrupt object file.  
+
+The harness will have a helper function:
+
+.. c:function:: void TH_do_interrupt(H2K_thread_context *src, H2K_thread_context *dest, u32_t num)
+
+This function will load the appropriate registers from the src thread context, set
+SGP to the storage pointed to by `dest`, and call :c:func:`H2K_handle_int()` with the
+correct SSR CAUSE code for the interrupt corresponding to num having happened.
+
+For non-NULL SGP value tests, the approriate entry in H2K_inthandlers will point to a second helper function:
+
+.. c:function::  void TH_do_preempt(H2K_thread_context *src, H2K_thread_context *dest, u32_t num)
+
+This function will set R28 to point to the kernel globals, R0 to the storage
+pointed to by `dest`, set SGP to 0x1, and call :c:func:`H2K_handle_int()` with
+the correct SSR CAUSE code for the interrupt corresponding to num having
+happened.
+
+This simulates the scenario where the interrupt happened from the preemption point.
+
+.. c:function::  void TH_check_interrupt(H2K_thread_context *src, H2K_thread_context *dest)
+
+This function will check to make sure that the appropriate registers from `src` and `dest`
+are equal, to check that the context was saved correctly.  It will also check to make 
+sure that the continuation is set correctly, the stack is set up correctly, and the argument
+registers are correct.
+
+For NULL SGP value tests, the correct entry H2K_inthandlers will point to a simpler check for 
+the stack and arguments.
+
+All incorrect entries in H2K_inthandlers should be set to code that calls FAIL.
+

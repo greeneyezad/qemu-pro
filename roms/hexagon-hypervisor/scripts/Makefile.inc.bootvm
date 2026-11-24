@@ -1,0 +1,83 @@
+# Dear emacs, this is a -*- Makefile -*-
+
+ifndef MAKE_INC_BOOTVM
+MAKE_INC_BOOTVM := 1
+
+# Intermediate artifacts go under BUILD_DIR when set (e.g. by booter/Makefile);
+# fall back to the current directory for callers that don't set BUILD_DIR.
+_BOOTVM_BUILD_DIR := $(if $(BUILD_DIR),$(BUILD_DIR),.)
+
+VAPA_KERNEL_X_IN := $(INSTALLPATH)/scripts/vapa_kernel.x.in
+VAPA_KERNEL := $(_BOOTVM_BUILD_DIR)/vapa_kernel.x
+VAPA_BOOTVM := $(INSTALLPATH)/scripts/vapa_bootvm.x
+BOOTVM_S := $(INSTALLPATH)/src/bootvm.S
+BOOTVM_O := $(_BOOTVM_BUILD_DIR)/bootvm.o
+BOOTVM_IMAGE := $(_BOOTVM_BUILD_DIR)/bootvm_image
+BOOTVM_IMAGE_BIN := $(_BOOTVM_BUILD_DIR)/bootvm_image.bin
+BOOTVM_ENTRY_S := $(INSTALLPATH)/src/bootvm_entry.S
+BOOTVM_ENTRY_O := $(_BOOTVM_BUILD_DIR)/bootvm_entry.o
+BOOTVM_SYMBOLS := $(_BOOTVM_BUILD_DIR)/bootvm_image.sym
+BOOTVM_PROG_TMP := $(BOOTVM_PROG)_tmp
+BOOTVM_CLEAN := $(BOOTVM_IMAGE) $(BOOTVM_IMAGE_BIN) $(BOOTVM_SYMBOLS) $(VAPA_KERNEL) $(BOOTVM_PROG) $(BOOTVM_PROG_TMP)
+
+SYMS := $(INSTALLPATH)/scripts/syms.pl
+
+include $(H2DIR)/scripts/Makefile.inc.constants
+
+
+CFLAGS += -DH2K_KERNEL_PGSIZE=$(H2K_KERNEL_PGSIZE) -DH2K_KERNEL_ADDRBITS=$(H2K_KERNEL_ADDRBITS) -DH2K_GUEST_START=$(H2K_GUEST_START) -DH2K_GUEST_END=$(H2K_GUEST_END) -DH2K_BOOTVM_OFFSET=$(H2K_BOOTVM_OFFSET) $(BOOTVM_EXTRA_CFLAGS)
+
+ifdef BOOTVM_DEBUG
+CFLAGS += -DBOOTVM_DEBUG
+endif
+
+ifdef MULTICORE
+CFLAGS += -DMULTICORE
+endif
+
+BOOTVM_IMAGE_CFLAGS = -Wl,--section-start=.entry=$(H2K_BOOTVM_OFFSET) -Wl,--script=$(VAPA_BOOTVM)
+
+BOOTVM_CFLAGS = -nostartfiles -Wl,--whole-archive $(INSTALLPATH)/lib/libh2kernel.a -Wl,-no-whole-archive -Wl,--section-start=.entry=$(H2K_LINK_ADDR) -Wl,--section-start=.bootvm=$(H2K_BOOTVM_START) -Wl,--defsym=HEAP_SIZE=$(H2K_HEAP_SIZE) -Wl,--defsym=STACK_SIZE=$(H2K_STACK_SIZE) -Wl,--defsym=H2K_ALLOC_HEAP_SIZE=$(H2K_ALLOC_HEAP_SIZE) -Wl,--defsym=H2K_KERNEL_NPAGES=$(H2K_KERNEL_NPAGES) -Wl,--script=$(VAPA_KERNEL) -Wl,--defsym=__entry=$(H2K_LOAD_ADDR) -Wl,--entry=__entry -Wl,--defsym=__bootvm_entry_point=$(H2K_BOOTVM_OFFSET) -Wl,-mv$(TOOLARCH) # -Wl,--just-symbols=$(BOOTVM_SYMBOLS)
+
+BOOTVM_IMAGE_DEPS = $(VAPA_BOOTVM) $(BOOTVM_ENTRY_O) | constants
+
+BOOTVM_DEPS = $(VAPA_KERNEL) $(INSTALLPATH)/lib/libh2kernel.a | constants
+
+
+$(_BOOTVM_BUILD_DIR)/%.o: %.c
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(_BOOTVM_BUILD_DIR)/%.o: %.S
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(CRT0_O): $(CRT0_S)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BOOTVM_O): $(BOOTVM_S) $(BOOTVM_IMAGE_BIN)
+	mkdir -p $(dir $@)
+	${CC} ${CFLAGS} -DBOOTVM_IMAGE_BIN_PATH='"$(BOOTVM_IMAGE_BIN)"' -c -o $@ $<
+
+$(VAPA_KERNEL): $(VAPA_KERNEL_X_IN) $(KERNEL_TMP) | constants
+	mkdir -p $(dir $@)
+	cat $< | perl -p -e 's/0xxxxxxxxx/$(H2K_LOAD_ADDR)/;' -e 's/0xyyyyyyyy/$(H2K_BOOTVM_OFFSET)/;' > $@
+
+$(BOOTVM_ENTRY_O): $(BOOTVM_ENTRY_S)
+	mkdir -p $(dir $@)
+	${CC} ${CFLAGS} -c -o $@ $<
+
+$(BOOTVM_IMAGE_BIN): $(BOOTVM_IMAGE)
+	$(ELFCOPY) -O binary $(BOOTVM_IMAGE) $@
+
+$(BOOTVM_PROG_TMP): $(BOOTVM_O) $(BOOTVM_DEPS)
+	${CC} $(LDFLAGS) $(CFLAGS) $(BOOTVM_CFLAGS) -o $@ $(BOOTVM_O)
+
+$(BOOTVM_SYMBOLS): $(BOOTVM_IMAGE) $(BOOTVM_PROG_TMP)
+	$(SYMS) $(BOOTVM_PROG_TMP) $(BOOTVM_IMAGE) $@
+
+$(BOOTVM_PROG): $(BOOTVM_O) $(BOOTVM_SYMBOLS) $(BOOTVM_DEPS)
+	${CC} $(LDFLAGS) $(CFLAGS) $(BOOTVM_CFLAGS) -Wl,@$(BOOTVM_SYMBOLS) -o $@ $(BOOTVM_O)
+
+endif

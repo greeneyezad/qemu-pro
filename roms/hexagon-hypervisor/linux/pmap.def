@@ -1,0 +1,15 @@
+/* Hey emacs, this is -*- C -*- */
+//MEMORY MAP	GLOBAL	ASID	VPN		PERMISSIONS	CACHEABILITY	PGSIZE		PART	PPN
+// Don't map page at address 0 - we lose NULL dereference checking...
+// except that by default all our builds build stuff to 0... so it breaks normal stuff.
+// monitor space
+//MEMORY_MAP(	1,	0,	0xff000,	NONE,		L1WB_L2C,	SIZE_4M,	MAIN,	0xff000)
+
+MEMORY_MAP(	0,	0,	(((LINUX_LINK_ADDR >> 22) + 0) << 10),	URWX,		L1WB_L2C,	SIZE_4M,	MAIN,	(((LINUX_LOAD_ADDR >> 22) + 0) << 10))
+MEMORY_MAP(	0,	0,	(((LINUX_LINK_ADDR >> 22) + 1) << 10),	URWX,		L1WB_L2C,	SIZE_4M,	MAIN,	(((LINUX_LOAD_ADDR >> 22) + 1) << 10))
+MEMORY_MAP(	0,	0,	(((LINUX_LINK_ADDR >> 22) + 2) << 10),	URWX,		L1WB_L2C,	SIZE_4M,	MAIN,	(((LINUX_LOAD_ADDR >> 22) + 2) << 10))
+MEMORY_MAP(	0,	0,	(((LINUX_LINK_ADDR >> 22) + 3) << 10),	URWX,		L1WB_L2C,	SIZE_4M,	MAIN,	(((LINUX_LOAD_ADDR >> 22) + 3) << 10))
+MEMORY_MAP(	0,	0,	(((LINUX_LINK_ADDR >> 22) + 4) << 10),	URWX,		L1WB_L2C,	SIZE_4M,	MAIN,	(((LINUX_LOAD_ADDR >> 22) + 4) << 10))
+MEMORY_MAP(	0,	0,	(((LINUX_LINK_ADDR >> 22) + 5) << 10),	URWX,		L1WB_L2C,	SIZE_4M,	MAIN,	(((LINUX_LOAD_ADDR >> 22) + 5) << 10))
+MEMORY_MAP(	0,	0,	(((LINUX_LINK_ADDR >> 22) + 6) << 10),	URWX,		L1WB_L2C,	SIZE_4M,	MAIN,	(((LINUX_LOAD_ADDR >> 22) + 6) << 10))
+MEMORY_MAP(	0,	0,	(((LINUX_LINK_ADDR >> 22) + 7) << 10),	URWX,		L1WB_L2C,	SIZE_4M,	MAIN,	(((LINUX_LOAD_ADDR >> 22) + 7) << 10))

@@ -1,0 +1,462 @@
+/*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+/* defines only */
+
+#ifndef H2K_MAX_H
+#define H2K_MAX_H
+
+#include <h2_common_pmap.h>
+#include <h2_common_defs.h>
+
+#define MAX_CORES 8
+
+#define CORE_REV_ARCH_MASK 0xff
+
+#define CORE_REV_L2_CHUNK_SWITCH 0x8 // where we start using bigger chunks. HATE
+#define L2_TAG_CHUNK 0x8000  //  32K
+#define L2_CHUNK 0x20000     // 128K
+#define L2_BIG_CHUNK 0x40000 // 256K
+
+#define CORE_V4  0x04
+#define CORE_V5  0x05
+#define CORE_V60 0x60
+#define CORE_V61 0x61
+#define CORE_V62 0x62
+#define CORE_V65 0x65
+#define CORE_V66 0x66
+#define CORE_V67 0x67
+#define CORE_V68 0x68
+#define CORE_V69 0x69
+#define CORE_V70 0x70
+#define CORE_V71 0x71
+#define CORE_V72 0x72
+#define CORE_V73 0x73
+#define CORE_V75 0x75
+#define CORE_V77 0x77
+#define CORE_V79 0x79
+#define CORE_V81 0x81
+#define CORE_V85 0x85
+#define CORE_V87 0x87
+#define CORE_V89 0x89
+#define CORE_V91 0x91
+
+#define CORE_V6_A 0x0
+#define CORE_V6_B 0x1
+#define CORE_V6_C 0x3
+#define CORE_V6_D 0x7
+#define CORE_V6_E 0x8
+#define CORE_V6_G 0x4
+#define CORE_V6_H 0x6
+#define CORE_V6_J 0x7
+#define CORE_V6_P 0x8
+#define CORE_V6_Q 0xf
+#define CORE_V6_S 0x2
+#define CORE_V6_U 0x5
+
+#define TEMP_MAP_VA 0xff800000  // leaves at most 8M for kernel at 0xff000000
+#define TEMP_MAP_PG_SIZE SIZE_4K  // default
+
+#define GPIO_VA 0xff7f8000
+#define GPIO_PG_SIZE SIZE_4K
+#define GPIO_PG_MASK (0xffffffff << (PAGE_BITS + (GPIO_PG_SIZE * 2)))
+
+#define MAX_TLB_ENTRIES 192
+#define TLB_ENTRY_C_BITS 24
+#define TLB_ENTRY_GLOBAL_BIT 62
+#define TLB_ENTRY_VALID_BIT 63
+#define DMA_TLB_START 512
+
+#define KERNEL_STACK_SIZE (8 * 64)
+
+#ifdef CRASH_DEBUG
+#define KERNEL_CRASH_TCM_ADDR 0xFF070000
+#endif
+
+#define MAX_PRIOS 256
+#define MAX_PRIO ((MAX_PRIOS) - 1)
+#define BEST_PRIO 0
+
+#if ARCHV <= 3
+#define ASID_BITS 5
+#else
+#define ASID_BITS 7
+#endif
+
+#define MAX_ASIDS (1<<(ASID_BITS))
+
+#define MODECTL_E_MASK 0x0000ffff
+#define MODECTL_W_BITS 16
+#define MODECTL_W_MASK 0xffff0000
+
+/* Hardware threads this build supports; never start or account beyond it. */
+#define MAX_HTHREADS_MASK ((1U << MAX_HTHREADS) - 1)
+
+
+/* QDSP6SS_PRIV_BASE is the subsystem base value read from cfg_table, but we
+	 map QDSP6SS_PUB_BASE to Q6_SS_BASE_VA so we can get at the public registers.
+	 FIXME? Is the QDSP6SS_PUB_PRIV_OFFSET the same for all subsystems? */
+
+#define DEVICE_PAGE_SIZE SIZE_1M
+
+#define Q6_SS_BASE_VA 0xffc00000  // leaves at most 4M for tmpmap at 0xff800000
+#define QDSP6SS_PUB_PRIV_OFFSET 0x80000
+
+#define L2CFG_BASE_VA 0xffd00000
+
+#define ANGEL_VA 0xffe00000
+#define ANGEL_PG_SIZE SIZE_4K
+
+#if ARCHV == 4
+/* #define QDSP6SS_PRIV_BASE_FW    0x08880000 */
+/* #define QDSP6SS_PRIV_BASE_SW    0x08980000 */
+/* #define QDSP6SS_PRIV_BASE_LPASS 0x28880000 */
+
+#define L2VIC_OFFSET 0x10000
+#define TIMER_OFFSET 0x4000
+
+#endif
+
+#if ARCHV >= 5
+#define QDSP6SS_PRIV_BASE_MSS   0xFC900000
+#define QDSP6SS_PRIV_BASE_LPASS 0xFE280000
+
+#define L2VIC_OFFSET 0x10000
+#define TIMER_OFFSET 0x20000
+
+#ifdef HAVE_EXTENSIONS
+
+#if ARCHV < 65
+#define QDSP6SS_CP_CLK_CTL 0x000000fc
+#define QDSP6SS_CP_CLK_CTL_DISABLE      0x00000000
+#define QDSP6SS_CP_CLK_CTL_ENABLE       0x00000001
+
+#define QDSP6SS_CP_RESET   0x000000f8
+#define QDSP6SS_CP_RESET_ASSERT         0x00000001
+#define QDSP6SS_CP_RESET_DEASSERT       0x00000000
+
+#define QDSP6SS_CP_PWR_CTL 0x000000f0
+#define QDSP6SS_CP_PWR_CTL_CLAMP_IO_ON_V60  0x011fffff
+#define QDSP6SS_CP_PWR_CTL_CLAMP_IO_OFF_V60 0x010fffff
+#define QDSP6SS_CP_PWR_CTL_POWER_OFF_V60    0x001fffff
+
+#define QDSP6SS_CP_PWR_CTL_CLAMP_IO_ON_V62  0x00000003
+#define QDSP6SS_CP_PWR_CTL_CLAMP_IO_OFF_V62 0x00000002
+#define QDSP6SS_CP_PWR_CTL_POWER_OFF_V62    0x00000001
+
+#else
+
+// v65
+#define QDSP6SS_CP_CLK_CTL 0x00000508
+#define QDSP6SS_CP_CLK_CTL_DISABLE          0x00000000
+#define QDSP6SS_CP_CLK_CTL_ENABLE           0x00000001
+
+#define QDSP6SS_CP_RESET   0x00000504
+#define QDSP6SS_CP_RESET_ASSERT             0x00000001
+#define QDSP6SS_CP_RESET_DEASSERT           0x00000000
+
+#define QDSP6SS_CP_PWR_CTL 0x00000500
+#define QDSP6SS_CP_PWR_CTL_CLAMP_IO_BIT     0
+#define QDSP6SS_CP_PWR_CTL_CLAMP_QMC_MEM_BIT 4
+
+#define QDSP6SS_CP_BHS_STATUS 0x00000518
+#define QDSP6SS_CP_BHS_STATUS_BHS_ON_BIT    0
+
+#define QDSP6SS_CP_BHS_CFG 0x00000510
+#define QDSP6SS_CP_BHS_CFG_BHS_ON_BIT       0
+
+#define QDSP6SS_CP_BHS_CMD 0x00000514
+#define QDSP6SS_CP_BHS_CMD_UPDATE_BIT       0
+
+#define QDSP6SS_CPMEM_CFG 0x00000520
+#define QDSP6SS_CPMEM_CFG_VTCM_POWER_ON     0x00000003
+
+#define QDSP6SS_CPMEM_CMD 0x00000524
+#define QDSP6SS_CPMEM_CMD_UPDATE_VTCM_SLP_NRET_N_BIT 0
+#define QDSP6SS_CPMEM_CMD_UPDATE_VTCM_SLP_RET_N_BIT  1
+
+#define QDSP6SS_CPMEM_STATUS 0x00000528
+#define QDSP6SS_CPMEM_STATUS_VTCM_SLP_NRET_N_BIT 0
+#define QDSP6SS_CPMEM_STATUS_VTCM_SLP_RET_N_BIT  1
+
+#endif
+
+#if ARCHV >= 68
+
+#define QDSP6SS_RSCC_RSC_SEQ_BUSY_DRV0  0x00030404
+#define QDSP6SS_RSCC_RSC_SEQ_BUSY_DRV0_STATUS_BIT 0
+
+#define QDSP6SS_RSCC_RSC_SEQ_OVERRIDE_TRIGGER_DRV0  0x00030460
+#define QDSP6SS_RSCC_RSC_SEQ_OVERRIDE_TRIGGER_DRV0_TRIGGER_BIT  0
+
+#define QDSP6SS_RSCC_RSC_SEQ_OVERRIDE_TRIGGER_START_ADDR_DRV0    0x00030464
+#define QDSP6SS_RSCC_RSC_SEQ_OVERRIDE_TRIGGER_START_ADDR_DRV0_ADDRESS_BITMASK   0x000003FF
+
+#endif
+
+#endif
+
+#endif
+
+#define PERCPU_INTERRUPTS 16
+
+#if ARCHV <= 3
+#define MAX_INTERRUPTS 32
+
+#else
+#define H2K_L2_CONTROL 1
+#define L2_INTERRUPT_START 32
+#if ARCHV >= 65
+#define L2_CORE_INTERRUPT 2
+#define L1_INTERRUPTS 8
+#else
+#define L2_CORE_INTERRUPT 31
+#define L1_INTERRUPTS 32
+#endif
+#define MAX_L2_INTERRUPTS 480
+#define MAX_INTERRUPTS (32+MAX_L2_INTERRUPTS)
+#endif
+
+#define RESCHED_INT 1
+#define VM_IPI_INT 0
+// interrupts 3-5 for l2vic 1-3
+#define CLUSTER_RESCHED_INT 6
+
+#define TIMER_INT_CORE_V4 50
+#define TIMER_INT_CORE_V5 34
+#define TIMER_INT_CORE_V60 34
+#define TIMER_INT_CORE_V61 34
+
+#define MAX_TRACE_LEVEL 0
+#define DEFAULT_TRACE_ENTRIES 16
+
+#define STLB_MAX_SETS_LOG2 11
+#define STLB_MAX_SETS (1<<(STLB_MAX_SETS_LOG2))
+#define STLB_MULT 2
+#define STLB_MAX_WAYS 4
+#define STLB_SHIFT 16		// optimize for 64KB pages
+#define STLB_ENTRIES (STLB_MAX_SETS * STLB_MAX_WAYS * STLB_MULT)
+
+#define PAGE_SIZE (0x1 << PAGE_BITS)
+#define H2K_PAGESIZE (1 << ((PAGE_BITS) + ((H2K_KERNEL_PGSIZE) * 2)))
+
+#define SSR_IE_BIT 18
+
+#if ARCHV <= 3
+#define RESCHED_INT_INTMASK (0x80000000 >> RESCHED_INT)
+#define VM_IPI_INTMASK (0x80000000 >> VM_IPI_INT)
+#define SSR_GUEST_BIT 13
+#else
+#define RESCHED_INT_INTMASK (0x00000001 << RESCHED_INT)
+#define CLUSTER_RESCHED_INT_INTMASK (0x00000001 << CLUSTER_RESCHED_INT)
+#define VM_IPI_INTMASK (0x00000001 << VM_IPI_INT)
+#define SSR_GUEST_BIT 19
+#define SSR_SS_BIT 30
+#endif
+
+#define CLUSTER_SCHED_MIN_COPROCS 2  // allow at least this many coprocs per cluster
+#define CLUSTER_MAX_CLUSTERS 4  // max clusters per processor
+
+#define BITS_MASK(NBITS, START) ((u32_t)(((0x1 << ((NBITS))) - 1) << (START)))
+
+#define SSR_XA_BITS 27
+#define SSR_XA_NBITS 3
+#define SSR_XA_BITS_MASK BITS_MASK(SSR_XA_NBITS, SSR_XA_BITS)
+#define SSR_XE_BIT 31
+#define SSR_XE_BIT_MASK BITS_MASK(1, SSR_XE_BIT)
+
+#define SSR_XE2_BIT 26
+#define SSR_XE2_BIT_MASK BITS_MASK(1, SSR_XE2_BIT)
+
+//HLX XA3/XE3
+#define CCR_XE3_BIT 28
+#define CCR_XE3_BIT_MASK BITS_MASK(1, CCR_XE3_BIT)
+
+#define CCR_XA3_BITS 21
+#define CCR_XA3_NBITS 1
+#define CCR_XA3_BITS_MASK BITS_MASK(CCR_XA3_NBITS, CCR_XA3_BITS)
+
+// dual VXU
+#define CCR_COPROC_BIT 3
+#define CCR_COPROC_BIT_MASK BITS_MASK(1, CCR_COPROC_BIT)
+
+#define VWCTRL_EN_BIT 31
+#define VWCTRL_HI_BITS 16
+#define VWCTRL_HI_NBITS 12
+#define VWCTRL_HI_BITS_MASK BITS_MASK(VWCTRL_HI_NBITS, VWCTRL_HI_BITS)
+#define VWCTRL_LO_BITS 0
+#define VWCTRL_LO_NBITS 12
+
+#define CCR_L2CP_BITS 6
+#define CCR_L2CP_NBITS 2
+
+#if ARCHV <= 4
+#define BOOT_THREAD_USR 0x00000000
+#elif ARCHV == 5
+//HW D$ Prefetch off
+//#define BOOT_THREAD_USR 0x00050000
+//HW D$ Prefetch on
+#define BOOT_THREAD_USR 0x00056000
+#elif ARCHV == 60
+//FIXME
+#define BOOT_THREAD_USR 0x00056000
+#else
+#define BOOT_THREAD_USR 0x00057c00
+#endif
+
+#define BOOT_THREAD_SSR (0x01c60000 | (1<<SSR_GUEST_BIT))
+#if ARCHV == 60
+#define BOOT_THREAD_CCR 0x00130000	// for istariv1
+#else
+#define BOOT_THREAD_CCR 0x00170000
+#endif
+
+/* ensure UGP is 0 for default thread ID behavior in h2 libs */
+#define BOOT_THREAD_GPUGP 0
+
+#define MAX_VM_INTS 65535
+
+#define CACHEIDX_MAX 2048
+#define WAYS_MAX 16
+#define SETS_MAX (((32*1024)/32)/(WAYS_MAX))
+
+#ifndef MAX_BOOT_CONTEXTS
+#define MAX_BOOT_CONTEXTS 1
+#endif
+
+#define INTS_PER_BOOT_CONTEXT 32
+#define BOOT_STACK_SIZE 128
+
+#define ALLOC_UNIT 8 /* Words per smallest allocatable block */
+#define ALLOC_NUNITS 1024 // 32KB
+
+/* One extra unit at the beginning to hold the tag for the first block, so that
+	 pointers to allocated space are aligned.  We waste ALLOC_UNIT - 4 bytes. */
+#define DEFAULT_ALLOC_HEAP_SIZE ((ALLOC_NUNITS * ALLOC_UNIT) + ALLOC_UNIT)
+#endif
+
+#define PHYSREAD_HI_SHIFT 11
+
+#define CFG_TABLE_SHIFT 16
+#define CFG_TABLE_L2TCM 0x0
+#define CFG_TABLE_SSBASE 0x8
+#define CFG_TABLE_CORECFG_BASE 0xc
+#define CFG_TABLE_L2REGS 0x10
+#define CFG_TABLE_CLADEREGS 0x24
+#define CFG_TABLE_FASTL2VIC_BASE 0x28
+#define CFG_TABLE_JTLB_SIZE 0x2c
+#define CFG_TABLE_COPROC_TYPE 0x30
+#define CFG_TABLE_COPROC_CONTEXTS 0x34
+#define CFG_TABLE_VTCM_BASE 0x38
+#define CFG_TABLE_VTCM_SIZE 0x3c
+#define CFG_TABLE_L2TAG_SIZE 0x40
+#define CFG_TABLE_L2ARRAY_SIZE 0x44
+#define CFG_TABLE_HTHREADS_MASK 0x48
+#define CFG_TABLE_ECC_BASE 0x4c
+#define CFG_TABLE_L2_LINE_SZ 0x50
+#define CFG_TABLE_AUDIO_EXT 0x54
+#define CFG_TABLE_L2ITCM_SZ 0x58
+#define CFG_TABLE_L2ITCM_BASE 0x5c
+#define CFG_TABLE_CLADE2REGS 0x60
+#define CFG_TABLE_DTM_VERSION 0x64
+#define CFG_TABLE_DMA_VERSION 0x68
+#define CFG_TABLE_COPROC_VLENGTH 0x6c
+#define CFG_TABLE_CORE_ID 0x70
+#define CFG_TABLE_CORE_COUNT 0x74
+#define CFG_TABLE_HMX_INT8_RATE 0x78
+#define CFG_TABLE_HMX_FP16_RATE 0x7c
+#define CFG_TABLE_VX2XMODE 0x80
+#define CFG_TABLE_HLX_CONTEXTS 0x84
+#define CFG_TABLE_HLX_LENGTH 0x88
+
+#define CFG_TABLE_ACD_PRESET 0x9c
+#define CFG_TABLE_MND_PRESET 0xa0
+#define CFG_TABLE_L1D_SZ 0xa4
+#define CFG_TABLE_L1I_SZ 0xa8
+#define CFG_TABLE_L1D_WRITE_POLICY 0xac
+#define CFG_TABLE_VTCM_BANK_WIDTH 0xb0
+#define CFG_TABLE_ATOMICS_VERSION 0xb4
+#define CFG_TABLE_HVX_IEEE_PRESENT 0xb8
+#define CFG_TABLE_VICTIM_CACHE_MODE 0xbc
+
+#define CFG_TABLE_CONSISTENCY_DOMAIN 0xc4
+#define CFG_TABLE_CAPACITY_DOMAIN 0xc8
+#define CFG_TABLE_AXI3_LOWADDR 0xcc
+
+#define CFG_TABLE_CORECFG_PRESENT 0xd4
+
+#define CFG_TABLE_AXIM2_SECONDARY_BASE 0xdc
+#define CFG_TABLE_AXIM_DATA_WIDTH 0xe0
+
+#define CFG_TABLE_DMA_JTLB_SIZE 0xf0
+
+#define CFG_TABLE_UNIT_CONFIG_REG_BASE 0x108
+#define CFG_TABLE_UNIT_ID_OFFSET 0x0
+#define CFG_TABLE_UNIT_SUBID_OFFSET 0x4
+#define CFG_TABLE_UNIT_NEXT_OFFSET 0x8
+
+#define CFG_TABLE_COPROC_TYPE_HVX_MASK 0x1
+#define CFG_TABLE_COPROC_TYPE_SILVER_MASK 0x2
+#define CFG_TABLE_COPROC_TYPE_HMX_MASK 0x4
+#define CFG_TABLE_COPROC_TYPE_HLX_MASK 0x10
+
+#define EXT_HVX_CONTEXTS 4  // fallback for old cores that don't have this in cfg_table
+#define EXT_HVX_VTCM_BANK_WIDTH 16  // fallback for old cores that don't have this in cfg_table
+#define EXT_HVX_VTCM_OFFSET 0x200000
+#define EXT_HVX_VTCM_SIZE 256
+#define EXT_HVX_MAX_VLENGTH 128  // bytes
+
+#define LIMIT_L1D_SZ 16 // (value in kilobytes) fallback for old cores that don't have this in cfg_table
+#define LIMIT_L1I_SZ 16 // (value in kilobytes) fallback for old cores that don't have this in cfg_table
+
+#define L2REGS_COPROC_EGY_CFG             0x28
+#define L2REGS_COPROC_EGY_CFG_DEFAULT_V62 0xc3e03ff5
+#define L2REGS_COPROC_EGY_WEIGHTS         0x2c
+#define L2REGS_COPROC_EGY_WEIGHTS_DEFAULT_V62 0xa61686e0
+
+#define L2REGS_QOS_MODE                  0x100
+#define L2REGS_QOS_MODE_TL_BIT                      7
+//#define L2REGS_QOS_MODE_DEFAULT  0x0000022a
+
+#define L2REGS_QOS_MAX_TRANS             0x104
+#define L2REGS_QOS_ISSUE_RATE            0x108
+#define L2REGS_QOS_DANGER_ISSUE_RATE     0x10c
+#define L2REGS_QOS_SCOREBOARD_WATERMARK  0x110
+#define L2REGS_QOS_SCOREBOARD_WATERMARK_WM_L2_BITS  0
+#define L2REGS_QOS_SCOREBOARD_WATERMARK_WM_L2_LEN   8
+#define L2REGS_QOS_SCOREBOARD_WATERMARK_WM_L2 (((0x1 << L2REGS_QOS_SCOREBOARD_WATERMARK_WM_L2_LEN) - 1) << L2REGS_QOS_SCOREBOARD_WATERMARK_WM_L2_BITS)
+#define L2REGS_QOS_SCOREBOARD_WATERMARK_WM_LO_BITS  8
+#define L2REGS_QOS_SCOREBOARD_WATERMARK_WM_LO_LEN   8
+#define L2REGS_QOS_SCOREBOARD_WATERMARK_WM_LO (((0x1 << L2REGS_QOS_SCOREBOARD_WATERMARK_WM_LO_LEN) - 1) << L2REGS_QOS_SCOREBOARD_WATERMARK_WM_LO_BITS)
+#define L2REGS_QOS_SCOREBOARD_WATERMARK_WM_HI_BITS 16
+#define L2REGS_QOS_SCOREBOARD_WATERMARK_WM_HI_LEN   8
+#define L2REGS_QOS_SCOREBOARD_WATERMARK_WM_HI (((0x1 << L2REGS_QOS_SCOREBOARD_WATERMARK_WM_HI_LEN) - 1) << L2REGS_QOS_SCOREBOARD_WATERMARK_WM_HI_BITS)
+
+#define L2REGS_QOS_SCOREBOARD_WATERMARK_DEFAULT ((1 << L2REGS_QOS_SCOREBOARD_WATERMARK_WM_HI_BITS) | (24 << L2REGS_QOS_SCOREBOARD_WATERMARK_WM_LO_BITS) | (24 << L2REGS_QOS_SCOREBOARD_WATERMARK_WM_L2_BITS))
+
+#define L2REGS_QOS_SYS_PRI               0x114
+#define L2REGS_QOS_DANGER_0             0x1000
+#define L2REGS_QOS_DANGER_1             0x2000
+#define L2REGS_QOS_DANGER_2             0x3000
+#define L2REGS_QOS_DANGER_3             0x4000
+
+#define L2REGS_MAX L2REGS_QOS_DANGER_3
+
+#define CLADEREGS_MAX                    ((CLADE_REG_PD_CHUNK * CLADE_NUM_PDS) + 0x1c)
+
+#define CORECFG_ETM_BASE               0x0000
+#define CORECFG_LIVELOCK_BASE          0x1000
+#define CORECFG_STRIDE_PREFETCHER_BASE 0x2000
+#define CORECFG_DPM_VOLTLMTMGMT_BASE   0x3000
+
+#define CORECFG_PRESENT_ETM_MASK               0x1
+#define CORECFG_PRESENT_LIVELOCK_MASK          0x2
+#define CORECFG_PRESENT_STRIDE_PREFETCHER_MASK 0x4
+#define CORECFG_PRESENT_DPM_VOLTLMTMGMT_MASK   0x8
+
+
+#ifndef LOGBUF_PER_HT_SIZE
+#define LOGBUF_PER_HT_SIZE (4 * 1024)  // bytes, per hardware thread
+#endif

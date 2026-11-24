@@ -1,0 +1,95 @@
+/*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+#include <qurt.h>
+#include <stdio.h>
+
+#define MAX_THREADS 8
+#define STACK_SIZE 128
+//#define DEBUG 1
+
+qurt_sem_t pingsem[MAX_THREADS];
+qurt_sem_t tomain;
+
+unsigned long long int stacks[MAX_THREADS][STACK_SIZE];
+
+#ifdef DEBUG
+#define ITERS 10
+#else
+#define ITERS (500)
+#endif
+
+#ifdef H2_H
+static inline void my_thread_create(void *f, void *s, int ss, void *p, int prio) { h2_thread_create(f,s,p,prio); }
+static inline void my_thread_stop(int status) { h2_thread_stop(status); }
+#else
+static inline void my_thread_create(void *f, void *s, int ss, void *p, int prio) { 
+	qurt_thread_attr_t attr;
+	qurt_thread_t tid;
+	int ret;
+	char tname[16];
+	sprintf(tname, "T%08x",(int)p);
+
+	//printf( "thread %d started\n", id );
+	qurt_thread_attr_set_name(&attr, (char*)tname);
+    
+	qurt_thread_attr_init (&attr);
+	qurt_thread_attr_set_stack_size (&attr, ss);
+	qurt_thread_attr_set_stack_addr (&attr, s);
+	qurt_thread_attr_set_priority (&attr, prio);
+	/* TIMETEST IDs 0 - 31 are reserved for interrrupts */
+	qurt_thread_attr_set_timetest_id (&attr, prio);
+
+	ret = qurt_thread_create(&tid, &attr, f, (void *)p);
+	if (ret == -1) {
+		printf(" failed to create thread \n");
+	}
+}
+
+static inline void my_thread_stop(int status) { qurt_thread_exit(status); }
+#endif
+
+void ping(void *id) {
+	int i;
+	int myid = (int)id;
+	qurt_sem_t deadlock;
+	qurt_sem_t *in, *out;
+	printf("Ping thread %d\n",myid);
+	qurt_sem_init_val(&deadlock,0);
+	in = &pingsem[myid];
+	if (myid == (MAX_THREADS-1)) out = &pingsem[0];
+	else out = &pingsem[myid+1];
+	qurt_sem_up(&tomain);
+	for (i = 0; i < ITERS; i++) {
+		qurt_sem_down(in);
+		#ifdef DEBUG
+		printf("%d: ping!\n",myid);
+		#endif
+		qurt_sem_up(out);
+	}
+	if (myid == MAX_THREADS-1) qurt_sem_up(&tomain);
+	my_thread_stop(0);
+	//	while (1) qurt_sem_down(&deadlock);
+}
+
+char context_space[1024];
+
+int main() {
+	unsigned long long int start,end;
+	int i;
+	qurt_sem_init_val(&tomain,0);
+	for (i = 0; i < MAX_THREADS; i++) {
+		qurt_sem_init_val(&pingsem[i],0);
+		my_thread_create(ping,&stacks[i][STACK_SIZE],STACK_SIZE*8,(void *)i,100);
+		qurt_sem_down(&tomain);
+	}
+	start = qurt_get_core_pcycles();
+	qurt_sem_up(&pingsem[0]);
+	qurt_sem_down(&tomain);
+	end = qurt_get_core_pcycles();
+	printf("TEST PASSED - %.0f\n", (float) (end - start) / (float) (ITERS*MAX_THREADS));
+	exit(0);
+	return 0;
+}
