@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Independent x86_64 QEMU build with Dell Precision 16s-inspired Pro machine presets.">
+  <title>QEMU Pro | Dell Precision 16s machine presets</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220;
+      --panel: #121d30;
+      --panel-soft: #17243a;
+      --line: #2a3a53;
+      --text: #edf3fb;
+      --muted: #b6c4d8;
+      --accent: #73daca;
+      --accent-dark: #102b2c;
+      --link: #8db9ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    a { color: var(--link); }
+
+    a:focus-visible, button:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .wrap {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      background: #0e1828;
+    }
+
+    .nav {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      color: var(--text);
+      font-weight: 750;
+      letter-spacing: .02em;
+      text-decoration: none;
+    }
+
+    nav { display: flex; flex-wrap: wrap; gap: 18px; }
+    nav a { color: var(--muted); text-decoration: none; }
+    nav a:hover { color: var(--text); }
+
+    main { padding: 58px 0 72px; }
+
+    .hero {
+      max-width: 800px;
+      padding-bottom: 36px;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 4px 10px;
+      border: 1px solid #2f655e;
+      border-radius: 999px;
+      background: var(--accent-dark);
+      color: var(--accent);
+      font-size: .82rem;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 18px 0 12px;
+      font-size: clamp(2.2rem, 6vw, 4rem);
+      line-height: 1.08;
+      letter-spacing: -.04em;
+    }
+
+    h2 { margin: 0 0 18px; font-size: clamp(1.45rem, 3vw, 2rem); }
+    h3 { margin: 0 0 8px; }
+    p { margin: 0 0 14px; }
+    .lede { max-width: 720px; color: var(--muted); font-size: 1.12rem; }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+
+    .button {
+      display: inline-block;
+      padding: 10px 16px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--panel);
+      color: var(--text);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #09201e;
+    }
+
+    section { margin-top: 52px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .card, .panel {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      padding: 22px;
+    }
+
+    .card p, .panel p, .muted { color: var(--muted); }
+    .tag {
+      display: inline-block;
+      margin-bottom: 12px;
+      color: var(--accent);
+      font-size: .83rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 7px 14px;
+      margin: 16px 0 0;
+    }
+
+    dt { color: var(--muted); }
+    dd { margin: 0; font-weight: 650; }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 12px 0;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #080e18;
+      color: #d7e5f6;
+      font: .9rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .notice {
+      border-left: 4px solid var(--accent);
+      border-radius: 0 10px 10px 0;
+      background: var(--panel-soft);
+      padding: 16px 18px;
+    }
+
+    .notice strong { color: var(--text); }
+    .downloads { display: grid; gap: 10px; }
+    .downloads a { font-weight: 700; }
+
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 24px 0 34px;
+      color: var(--muted);
+      font-size: .92rem;
+    }
+
+    @media (max-width: 760px) {
+      .grid, .two-col { grid-template-columns: 1fr; }
+      .nav { align-items: flex-start; flex-direction: column; padding: 16px 0; }
+      main { padding-top: 38px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <a class="brand" href="#top">QEMU Pro</a>
+      <nav aria-label="Main navigation">
+        <a href="#machines">Machines</a>
+        <a href="#hardware">Hardware reference</a>
+        <a href="#downloads">Downloads</a>
+        <a href="#usage">Getting started</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap" id="top">
+    <div class="hero">
+      <span class="eyebrow">Independent downstream x86_64 build</span>
+      <h1>Dell Precision 16s-inspired QEMU machines</h1>
+      <p class="lede">
+        QEMU 11.2.0-rc0 source with three Q35/ICH9 machine presets, sparse NVMe
+        disks, and ready-to-run Debian 13 packages.
+      </p>
+      <div class="actions">
+        <a class="button primary" href="https://github.com/greeneyezad/qemu-pro/releases/tag/qemu-11.2.0-rc0-profiles">Get the packages</a>
+        <a class="button" href="https://github.com/greeneyezad/qemu-pro">View source on GitHub</a>
+      </div>
+    </div>
+
+    <section id="machines">
+      <h2>Machine presets</h2>
+      <div class="grid">
+        <article class="card">
+          <span class="tag">Pro</span>
+          <h3><code>pro</code></h3>
+          <p>Q35/ICH9 preset with the Pro package's original defaults.</p>
+          <dl>
+            <dt>Virtual CPUs</dt><dd>12</dd>
+            <dt>Memory</dt><dd>32 GiB</dd>
+            <dt>Disk image</dt><dd>512 GiB qcow2</dd>
+            <dt>Display</dt><dd>Set 1920x1200 in the guest</dd>
+          </dl>
+        </article>
+        <article class="card">
+          <span class="tag">Pro2</span>
+          <h3><code>pro2</code></h3>
+          <p>Mid-sized preset with a preferred 16:10 display mode.</p>
+          <dl>
+            <dt>Virtual CPUs</dt><dd>16</dd>
+            <dt>Memory</dt><dd>16 GiB</dd>
+            <dt>Disk image</dt><dd>1 TiB qcow2</dd>
+            <dt>Preferred display</dt><dd>1920x1200</dd>
+          </dl>
+        </article>
+        <article class="card">
+          <span class="tag">Pro2NoCap</span>
+          <h3><code>pro2nocap</code></h3>
+          <p>Largest included preset; host resources still apply.</p>
+          <dl>
+            <dt>Virtual CPUs</dt><dd>32</dd>
+            <dt>Memory</dt><dd>32 GiB</dd>
+            <dt>Disk image</dt><dd>1 TiB qcow2</dd>
+            <dt>Preferred display</dt><dd>1920x1200</dd>
+          </dl>
+        </article>
+      </div>
+      <p class="muted" style="margin-top:14px">
+        Machine defaults can be overridden. The included launchers use the
+        defaults and attach each package's blank sparse NVMe image.
+      </p>
+    </section>
+
+    <section id="hardware">
+      <h2>Physical hardware reference</h2>
+      <div class="two-col">
+        <div class="panel">
+          <h3>Dell Precision 16s reference</h3>
+          <dl>
+            <dt>Operating system</dt><dd>Debian 13.7 (trixie), amd64</dd>
+            <dt>Desktop</dt><dd>KDE Plasma</dd>
+            <dt>Processor</dt><dd>Intel Core Ultra 5 336H, 12 cores, up to 4.6 GHz</dd>
+            <dt>NPU</dt><dd>Intel AI Boost, up to 47 TOPS</dd>
+            <dt>Memory</dt><dd>32 GB LPCAMM2</dd>
+            <dt>Storage</dt><dd>512 GB NVMe SSD</dd>
+            <dt>Display</dt><dd>16-inch WUXGA, 1920x1200, 16:10</dd>
+            <dt>Wireless</dt><dd>Wi-Fi 7 (802.11be)</dd>
+          </dl>
+        </div>
+        <div class="panel">
+          <h3>What QEMU models</h3>
+          <p>
+            These presets provide a generic Q35/ICH9 virtual PC. They do not
+            emulate the 336H silicon, NPU, Intel integrated GPU, Wi-Fi 7 radio,
+            laptop panel, or the physical machine's performance.
+          </p>
+          <p>
+            Pro2 and Pro2NoCap advertise 1920x1200 as a preferred VGA EDID mode.
+            The guest graphics driver and desktop settings determine the final
+            resolution and DPI.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="downloads">
+      <h2>Downloads</h2>
+      <div class="panel downloads">
+        <a href="https://github.com/greeneyezad/qemu-pro/releases/download/qemu-11.2.0-rc0-profiles/pro-qemu-11.2.0-rc0-x86_64.tar.xz">Pro x86_64 package (512 GiB disk)</a>
+        <a href="https://github.com/greeneyezad/qemu-pro/releases/download/qemu-11.2.0-rc0-profiles/pro2-qemu-11.2.0-rc0-x86_64.tar.xz">Pro2 x86_64 package (1 TiB disk)</a>
+        <a href="https://github.com/greeneyezad/qemu-pro/releases/download/qemu-11.2.0-rc0-profiles/pro2nocap-qemu-11.2.0-rc0-x86_64.tar.xz">Pro2NoCap x86_64 package (1 TiB disk)</a>
+        <p class="muted">Packages target Debian 13 (trixie) amd64. Each includes its README, launcher, firmware, QEMU tools, blank disk, and modified source archive.</p>
+      </div>
+    </section>
+
+    <section id="usage">
+      <h2>Getting started</h2>
+      <div class="two-col">
+        <div class="panel">
+          <h3>Install dependencies</h3>
+          <pre><code>sudo apt install libgtk-3-0t64 libepoxy0 \
+  libpixman-1-0 libglib2.0-0t64 zlib1g</code></pre>
+          <p class="muted">Extract a package, then run its launcher with a Debian amd64 installer ISO:</p>
+          <pre><code>sh ./run.sh /path/to/debian-amd64.iso</code></pre>
+          <p class="muted">After installation, run <code>sh ./run.sh</code> to boot from the included NVMe image.</p>
+        </div>
+        <div class="panel">
+          <h3>Custom 64-vCPU / 64-GiB setup</h3>
+          <p>
+            QEMU's Q35 machine accepts 64 vCPUs. A 64 GiB guest also needs
+            sufficient host memory; the build host used for these packages
+            cannot allocate that much. A 2 TiB qcow2 image is supported and is
+            sparse until data is written.
+          </p>
+          <pre><code>qemu-img create -f qcow2 supercomputer.qcow2 2T
+qemu-system-x86_64 -machine pro2nocap \
+  -smp 64 -m 64G -accel kvm -cpu host \
+  -drive file=supercomputer.qcow2,if=none,id=ssd,format=qcow2 \
+  -device nvme,drive=ssd,serial=supercomputer</code></pre>
+          <p class="muted">KVM and <code>-cpu host</code> require a compatible Linux host. Host CPU, RAM, and storage remain the limiting factors.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="frequency">
+      <h2>About the 8.20 GHz request</h2>
+      <div class="notice">
+        <p><strong>QEMU cannot force a VM to execute at 8.20 GHz.</strong> Guest throughput depends on the host CPU and accelerator; QEMU has no execution-frequency cap to remove.</p>
+        <p>A guest TSC frequency setting can report a chosen timer rate, but it does not make instructions execute faster and may affect guest timekeeping. KVM can approach host performance when available, not exceed the host processor's capabilities.</p>
+      </div>
+    </section>
+
+    <section id="source">
+      <h2>Source and project status</h2>
+      <div class="panel">
+        <p>
+          This is an independently maintained downstream build, not an
+          official QEMU release. The source and machine documentation are
+          available in the
+          <a href="https://github.com/greeneyezad/qemu-pro">public GitHub repository</a>.
+        </p>
+        <p>
+          QEMU source licensing details are in the
+          <a href="https://github.com/greeneyezad/qemu-pro/blob/main/LICENSE">LICENSE file</a>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      QEMU Pro is an independent downstream project and is not affiliated with or endorsed by Dell or the QEMU project.
+    </div>
+  </footer>
+</body>
+</html>
